@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgaveWMS – Gestionale Magazzino</title>
+  <title>Agave WMS – Gestionale Magazzino</title>
   <meta name="description" content="Software gestionale magazzino professionale: carico, scarico, giacenze, movimenti, report e importazione CSV." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -16,7 +16,7 @@
   <div class="login-card">
     <div class="login-logo">
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="14" fill="url(#lg1)"/><path d="M24 12C24 12 16 18 16 26C16 30.418 19.582 34 24 34C28.418 34 32 30.418 32 26C32 18 24 12 24 12Z" stroke="#fff" stroke-width="2.5" fill="rgba(255,255,255,0.2)"/><path d="M24 34V20M24 28L19 23M24 24L28 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><defs><linearGradient id="lg1" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10b981"/><stop offset="1" stop-color="#047857"/></linearGradient></defs></svg>
-      <span>AgaveWMS</span>
+      <span>Agave WMS</span>
     </div>
     <h1>Accedi al Gestionale</h1>
     <p class="login-sub">Inserisci le tue credenziali per continuare</p>
@@ -42,7 +42,7 @@
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="14" fill="url(#lg2)"/><path d="M24 12C24 12 16 18 16 26C16 30.418 19.582 34 24 34C28.418 34 32 30.418 32 26C32 18 24 12 24 12Z" stroke="#fff" stroke-width="2.5" fill="rgba(255,255,255,0.2)"/><path d="M24 34V20M24 28L19 23M24 24L28 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><defs><linearGradient id="lg2" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10b981"/><stop offset="1" stop-color="#047857"/></linearGradient></defs></svg>
-        <span>AgaveWMS</span>
+        <span>Agave WMS</span>
       </div>
       <button id="sidebar-toggle" class="sidebar-toggle" onclick="App.toggleSidebar()">&#9776;</button>
     </div>
@@ -143,6 +143,22 @@
     </div>
     <div id="modal-body" class="modal-body"></div>
     <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+
+<!-- CHATBOT -->
+<div id="ai-chat-btn" class="ai-chat-btn" onclick="App.toggleChat()">✨</div>
+<div id="ai-chat-panel" class="ai-chat-panel hidden">
+  <div class="ai-chat-header">
+    <div style="display:flex;align-items:center;gap:8px">✨ <b style="color:var(--text)">Agave AI</b></div>
+    <button onclick="App.toggleChat()" style="color:var(--text2);font-size:1.2rem">&times;</button>
+  </div>
+  <div class="ai-chat-body" id="ai-chat-body">
+    <div class="ai-msg ai">Ciao! Sono il tuo assistente AI. Chiedimi i prodotti meno venduti, le scorte, o i margini di profitto!</div>
+  </div>
+  <div class="ai-chat-input">
+    <input type="text" id="ai-chat-input-field" placeholder="Scrivi una domanda..." onkeydown="if(event.key==='Enter') App.sendChat()"/>
+    <button onclick="App.sendChat()">➤</button>
   </div>
 </div>
 

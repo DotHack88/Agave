@@ -32,7 +32,8 @@ const DB = (() => {
       save(KEYS.users, [
         { id:1, username:'admin', password:'admin', name:'Amministratore', role:'admin', active:true, created:now() },
         { id:2, username:'magazziniere', password:'1234', name:'Mario Rossi', role:'warehouse', active:true, created:now() },
-        { id:3, username:'operatore', password:'1234', name:'Luca Bianchi', role:'operator', active:true, created:now() }
+        { id:3, username:'operatore', password:'1234', name:'Luca Bianchi', role:'operator', active:true, created:now() },
+        { id:4, username:'Daniele', password:'Citerio', name:'Daniele Citerio', role:'admin', active:true, created:now() }
       ]);
     }
     // Default settings
@@ -276,8 +277,138 @@ const DB = (() => {
     }
   };
 
+  // ── AI & SMART FEATURES ──
+  const AI = {
+    getInsights() {
+      const prods = Products.active();
+      const moves = Movements.all();
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString();
+      
+      const insights = [];
+      
+      const sales = {};
+      moves.filter(m => m.type === 'out' && m.ts >= thirtyDaysAgo).forEach(m => {
+        sales[m.productId] = (sales[m.productId] || 0) + m.qty;
+      });
+
+      let maxSales = 0;
+      let topProd = null;
+      prods.forEach(p => {
+        const sold = sales[p.id] || 0;
+        if (sold > maxSales) { maxSales = sold; topProd = p; }
+        
+        if (sold > 0 && p.qty > 0 && p.qty <= p.qtyMin * 2) {
+          const dailyRate = sold / 30;
+          const daysLeft = Math.round(p.qty / dailyRate);
+          if (daysLeft > 0 && daysLeft < 15) {
+            insights.push({ type: 'warning', icon: '⏳', text: `<b>${p.name}</b> si esaurirà tra circa <b>${daysLeft} giorni</b> al ritmo attuale.` });
+          }
+        }
+      });
+
+      if (topProd && maxSales > 0) {
+         insights.push({ type: 'success', icon: '🔥', text: `<b>${topProd.name}</b> è il prodotto del momento (${maxSales} vendite in 30gg).` });
+      }
+
+      const ninetyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 90)).toISOString();
+      const deadStock = prods.filter(p => p.qty > 0 && !moves.some(m => m.productId === p.id && m.ts >= ninetyDaysAgo));
+      if (deadStock.length > 0) {
+        insights.push({ type: 'danger', icon: '🧊', text: `Hai <b>${deadStock.length} prodotti</b> fermi da oltre 90 giorni. Valuta una promozione.` });
+      }
+
+      return insights;
+    },
+
+    ask(query) {
+      const q = query.toLowerCase();
+      
+      if (q.includes('vendut') && q.includes('meno')) {
+         const moves = Movements.filter({type:'out'});
+         const sales = {};
+         Products.active().forEach(p => sales[p.id] = 0);
+         moves.forEach(m => { if (sales[m.productId] !== undefined) sales[m.productId] += m.qty; });
+         const sorted = Object.keys(sales).map(id => ({name: Products.find(Number(id))?.name, sold: sales[id]})).sort((a,b) => a.sold - b.sold).slice(0, 3);
+         let html = `Ecco i prodotti meno venduti:<br><br>`;
+         sorted.forEach(p => html += `• <b>${p.name}</b>: ${p.sold} unità<br>`);
+         return html;
+      }
+      
+      if (q.includes('profitto') || q.includes('margine')) {
+         const cats = Products.categories();
+         const cat = cats.find(c => q.includes(c.toLowerCase()));
+         let targetProds = Products.active();
+         let scope = "tutto il magazzino";
+         if (cat) {
+            targetProds = targetProds.filter(p => p.category === cat);
+            scope = `la categoria <b>${cat}</b>`;
+         }
+         let totalBuy = 0, totalSell = 0;
+         targetProds.forEach(p => {
+           if (p.priceBuy > 0 && p.priceSell > 0) {
+             totalBuy += (p.priceBuy * p.qty);
+             totalSell += (p.priceSell * p.qty);
+           }
+         });
+         if (totalBuy === 0) return `Non ho dati di costo sufficienti per calcolare il margine.`;
+         const margin = ((totalSell - totalBuy) / totalSell * 100).toFixed(1);
+         return `Il margine di profitto medio (sul valore a stock) per ${scope} è del <b>${margin}%</b>.`;
+      }
+
+      if (q.includes('quanti') || q.includes('scorte') || q.includes('disponibil')) {
+         const words = q.split(' ');
+         const searchWord = words.find(w => w.length > 3 && !['quanti','scorte','sono','della','delle','degli','disponibili'].includes(w));
+         if (searchWord) {
+            const res = Products.search(searchWord);
+            if (res.length > 0) {
+               return `Ne abbiamo <b>${res[0].qty}</b> pezzi di <b>${res[0].name}</b> in magazzino.`;
+            }
+         }
+      }
+
+      return "Scusa, non ho capito la domanda. Prova a chiedermi: 'Quali sono i prodotti meno venduti?' oppure 'Mostrami il margine di profitto'.";
+    },
+
+    enrichProduct(barcode) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const db = [
+            { code: '8001', name: 'Olio Essenziale di Lavanda 10ml', category: 'Oli Essenziali', desc: 'Puro olio essenziale estratto a vapore. Proprietà rilassanti.', notes: 'Benefici: Ottimo per ansia, insonnia e per profumare gli ambienti.' },
+            { code: '8002', name: 'Tisana Drenante Bio', category: 'Tisane', desc: 'Miscela di erbe officinali biologiche per favorire il drenaggio dei liquidi.', notes: 'Contiene: Betulla, Ortosiphon, Equiseto.' },
+            { code: '8003', name: "Crema Viso Antiage all'Argan", category: 'Cosmesi Naturale', desc: 'Crema idratante e rimpolpante per pelli mature.', notes: 'Uso: Applicare mattina e sera su viso e collo puliti.' }
+          ];
+          const match = db.find(d => barcode.startsWith(d.code)) || {
+            name: 'Prodotto Botanico AI (' + barcode + ')',
+            category: 'Rimedi Naturali',
+            desc: 'Prodotto generato e arricchito tramite AI.',
+            notes: 'Verificare le informazioni inserite automaticamente.'
+          };
+          resolve(match);
+        }, 1200);
+      });
+    }
+  };
+
   // ── BACKUP ──
   const Backup = {
+    dailyBackup() {
+      const todayStr = today();
+      const key = PREFIX + 'backup_daily_' + todayStr;
+      if (!localStorage.getItem(key)) {
+        const data = {
+          version:'1.0', exported:now(),
+          products: Products.all(), movements: Movements.all(),
+          users: Users.all(), settings: Settings.get(), counters: load(KEYS.counters)
+        };
+        localStorage.setItem(key, JSON.stringify(data));
+        const allKeys = Object.keys(localStorage).filter(k => k.startsWith(PREFIX + 'backup_daily_')).sort();
+        if (allKeys.length > 7) {
+          for (let i = 0; i < allKeys.length - 7; i++) {
+            localStorage.removeItem(allKeys[i]);
+          }
+        }
+      }
+    },
     autoBackup() {
       const data = {
         version:'1.0', exported:now(),
@@ -348,5 +479,6 @@ const DB = (() => {
   Users.delete = mutate(Users.delete);
 
   init();
-  return { Products, Movements, Users, Settings, CSV, Backup };
+  Backup.dailyBackup();
+  return { Products, Movements, Users, Settings, CSV, Backup, AI };
 })();

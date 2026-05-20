@@ -236,12 +236,45 @@ const App = (() => {
       toast(`Codice non trovato: ${code}`, 'warning');
       openModal('Nuovo Prodotto da Barcode', `
         <p style="color:var(--text2)">Nessun prodotto trovato con codice/barcode <b>${escape(code)}</b>.</p>
-        <p style="color:var(--text2);margin-top:8px">Vuoi creare una nuova anagrafica associata a questo codice?</p>
+        <p style="color:var(--text2);margin-top:8px">Come vuoi procedere?</p>
       `, `
         <button class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>
-        <button class="btn btn-primary" onclick="App.closeModal();App.navigate('products');Sections.openProductForm({barcode:'${escape(code)}'})">🆕 Crea Prodotto</button>
+        <button class="btn btn-primary" onclick="App.closeModal();App.navigate('products');Sections.openProductForm({barcode:'${escape(code)}'})">Crea Manualmente</button>
+        <button class="btn btn-warning" onclick="App.closeModal();Sections.autoEnrichProduct('${escape(code)}')">✨ Chiedi all'AI</button>
       `);
     }
+  }
+
+  // ── AI CHATBOT ──
+  function toggleChat() {
+    const p = document.getElementById('ai-chat-panel');
+    p.classList.toggle('hidden');
+    if (!p.classList.contains('hidden')) {
+      setTimeout(() => document.getElementById('ai-chat-input-field').focus(), 100);
+    }
+  }
+
+  function sendChat() {
+    const input = document.getElementById('ai-chat-input-field');
+    const msg = input.value.trim();
+    if (!msg) return;
+    
+    const body = document.getElementById('ai-chat-body');
+    body.innerHTML += `<div class="ai-msg user">${escape(msg)}</div>`;
+    input.value = '';
+    body.scrollTop = body.scrollHeight;
+
+    const typingId = 'typing-' + Date.now();
+    body.innerHTML += `<div id="${typingId}" class="ai-msg ai" style="color:var(--text2)">Sto analizzando...</div>`;
+    body.scrollTop = body.scrollHeight;
+
+    setTimeout(() => {
+      const el = document.getElementById(typingId);
+      if (el) el.remove();
+      const answer = DB.AI.ask(msg);
+      body.innerHTML += `<div class="ai-msg ai">${answer}</div>`;
+      body.scrollTop = body.scrollHeight;
+    }, 800);
   }
 
   // ── KEY LISTENERS ──
@@ -267,5 +300,5 @@ const App = (() => {
   // Init barcode scanner detector
   initBarcodeScanner();
 
-  return { login, logout, getUser, navigate, toggleTheme, toggleSidebar, globalSearch, toast, openModal, closeModal, confirm, updateNotifications, toggleNotifications, fmt, fmtDate, fmtDateTime, escape, handleBarcodeScanned };
+  return { login, logout, getUser, navigate, toggleTheme, toggleSidebar, globalSearch, toast, openModal, closeModal, confirm, updateNotifications, toggleNotifications, fmt, fmtDate, fmtDateTime, escape, handleBarcodeScanned, toggleChat, sendChat };
 })();

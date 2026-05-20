@@ -20,6 +20,7 @@ const Sections = (() => {
     const moves = DB.Movements.all().slice(0,8);
     const totalVal = DB.Products.totalValue();
     const totalQty = DB.Products.totalQty();
+    const insights = DB.AI.getInsights();
 
     el.innerHTML = `
 <div class="page-header"><h1>Dashboard</h1>
@@ -45,6 +46,20 @@ const Sections = (() => {
     <div class="stat-info"><div class="stat-value">${App.fmt(totalVal,0)}</div><div class="stat-label">Valore magazzino</div></div>
   </div>
 </div>
+
+<!-- NEW AI INSIGHTS CARD -->
+<div class="card" style="margin-bottom:24px;border-color:var(--primary);background:var(--primary-soft)">
+  <div class="card-header"><span class="card-title" style="color:var(--primary);font-size:1.1rem">✨ Agave AI – Smart Insights</span></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px">
+    ${insights.map(i => `
+      <div style="display:flex;align-items:flex-start;gap:12px;background:var(--bg2);padding:14px;border-radius:var(--radius-sm);box-shadow:var(--shadow-sm)">
+        <div style="font-size:1.6rem">${i.icon}</div>
+        <div style="font-size:.85rem;color:var(--text);line-height:1.4">${i.text}</div>
+      </div>
+    `).join('') || '<div style="color:var(--text2);font-size:.85rem;padding:10px">Nessun insight rilevante al momento. Il magazzino è stabile.</div>'}
+  </div>
+</div>
+
 <div class="grid-2" style="margin-bottom:16px">
   <div class="card">
     <div class="card-header"><span class="card-title">📈 Entrate / Uscite ultimi 6 mesi</span></div>
@@ -305,9 +320,24 @@ ${prods.length ? prods.map(p => {
     App.toast('Esportazione completata','success');
   }
 
+  function autoEnrichProduct(barcode) {
+    App.toast('Ricerca informazioni tramite AI in corso...', 'info');
+    DB.AI.enrichProduct(barcode).then(data => {
+      App.toast('Dati trovati e autocompilati!', 'success');
+      App.navigate('products');
+      openProductForm({
+        barcode: barcode,
+        name: data.name,
+        category: data.category,
+        description: data.desc,
+        notes: data.notes
+      });
+    });
+  }
+
   return { render, renderDashboard, renderProducts, setProdFilter, resetProdFilters,
     openProductForm, editProduct, saveProduct, duplicateProduct, deleteProduct, exportProducts,
-    handleProductImageUpload,
+    handleProductImageUpload, autoEnrichProduct,
     prefillInbound: () => {}, prefillOutbound: () => {},
     renderInbound:()=>{}, renderOutbound:()=>{}, renderMovements:()=>{},
     renderCSV:()=>{}, renderReports:()=>{}, renderSettings:()=>{} };
