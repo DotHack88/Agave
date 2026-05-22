@@ -42,7 +42,19 @@ button {
   cursor: pointer;
   transition: background 0.2s;
 }
-button:hover { background: #ff5252; }
-.hidden { display: none; }
-#status { margin-top: 1rem; font-weight: 500; }
-.setting { margin: 1rem 0; }
+/* Login controls – make input and button same height and aligned */
+.login-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.login-controls input {
+  flex: 1;
+  margin: 0;
+}
+.login-controls button {
+  flex: none;
+  margin: 0;
+}
+
