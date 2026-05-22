@@ -147,21 +147,7 @@
   </div>
 </div>
 
-<!-- CHATBOT -->
-<div id="ai-chat-btn" class="ai-chat-btn" onclick="App.toggleChat()">✨</div>
-<div id="ai-chat-panel" class="ai-chat-panel hidden">
-  <div class="ai-chat-header">
-    <div style="display:flex;align-items:center;gap:8px">✨ <b style="color:var(--text)">Agave AI</b></div>
-    <button onclick="App.toggleChat()" style="color:var(--text2);font-size:1.2rem">&times;</button>
-  </div>
-  <div class="ai-chat-body" id="ai-chat-body">
-    <div class="ai-msg ai">Ciao! Sono il tuo assistente AI. Chiedimi i prodotti meno venduti, le scorte, o i margini di profitto!</div>
-  </div>
-  <div class="ai-chat-input">
-    <input type="text" id="ai-chat-input-field" placeholder="Scrivi una domanda..." onkeydown="if(event.key==='Enter') App.sendChat()"/>
-    <button onclick="App.sendChat()">➤</button>
-  </div>
-</div>
+
 
 <!-- TOAST -->
 <div id="toast-container" class="toast-container"></div>

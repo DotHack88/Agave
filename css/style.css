@@ -332,3 +332,23 @@ canvas { width:100% !important; }
   .stats-grid { grid-template-columns:1fr; }
   .modal-box { max-height:100vh; border-radius:var(--radius) var(--radius) 0 0; align-self:flex-end; }
 }
+
+/* ── STANDALONE MODE ADJUSTMENTS ── */
+body.standalone-mode {
+  overflow-x: hidden;
+}
+body.standalone-mode .sidebar, 
+body.standalone-mode .topbar {
+  display: none !important;
+}
+body.standalone-mode .main-content {
+  margin-left: 0 !important;
+  padding: 16px !important;
+  width: 100% !important;
+}
+
+/* ── TABLE SCROLL FIX ── */
+.table-wrap table {
+  min-width: 700px;
+}
+

@@ -126,7 +126,7 @@ const DB = (() => {
     totalQty() { return this.active().reduce((s,p) => s + (p.qty || 0), 0); },
     filter(opts = {}) {
       let arr = this.active();
-      if (opts.q) { const s=opts.q.toLowerCase(); arr=arr.filter(p=>p.name.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.barcode?.includes(s)); }
+      if (opts.q) { const s=opts.q.toLowerCase(); arr=arr.filter(p=>p.name.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.barcode?.includes(s)||(p.brand&&p.brand.toLowerCase().includes(s))||(p.model&&p.model.toLowerCase().includes(s))); }
       if (opts.category) arr = arr.filter(p=>p.category===opts.category);
       if (opts.brand) arr = arr.filter(p=>p.brand===opts.brand);
       if (opts.supplier) arr = arr.filter(p=>p.supplier===opts.supplier);
@@ -196,10 +196,10 @@ const DB = (() => {
     },
     delete(id) { save(KEYS.users, this.all().filter(u=>u.id!==id)); },
     ROLES: { admin:'Amministratore', warehouse:'Magazziniere', operator:'Operatore', viewer:'Visualizzatore' },
-    canEdit(user) { return ['admin','warehouse'].includes(user?.role); },
-    canDelete(user) { return user?.role==='admin'; },
-    canImport(user) { return ['admin','warehouse'].includes(user?.role); },
-    canReport(user) { return ['admin','warehouse','operator'].includes(user?.role); }
+    canEdit(user) { return true; },
+    canDelete(user) { return true; },
+    canImport(user) { return true; },
+    canReport(user) { return true; }
   };
 
   // ── SETTINGS ──
@@ -423,6 +423,35 @@ const DB = (() => {
     },
     getAutoBackupTime() {
       return localStorage.getItem(PREFIX + 'backup_auto_time') || null;
+    },
+    checkAutoDownloadBackup() {
+      const nowVal = new Date();
+      const hours = nowVal.getHours();
+      if (hours >= 19) {
+        const todayStr = today();
+        const key = PREFIX + 'last_auto_download_backup_date';
+        const lastBackupDate = localStorage.getItem(key);
+        if (lastBackupDate !== todayStr) {
+          localStorage.setItem(key, todayStr);
+          setTimeout(() => {
+            Backup.export();
+            if (typeof App !== 'undefined' && typeof App.openModal === 'function') {
+              App.openModal('💾 Backup Automatico delle 19:00', `
+                <div style="text-align:center;padding:10px 0">
+                  <div style="font-size:3rem;margin-bottom:12px">💾</div>
+                  <h3 style="margin-bottom:8px">Backup Automatico Eseguito!</h3>
+                  <p style="color:var(--text2);font-size:.9rem;line-height:1.5">
+                    È stato avviato il download automatico del database.<br>
+                    <b>Sposta il file appena scaricato nella cartella del Desktop del PC del negozio.</b>
+                  </p>
+                </div>
+              `, `
+                <button class="btn btn-primary" onclick="App.closeModal()">Ho capito</button>
+              `);
+            }
+          }, 1000);
+        }
+      }
     },
     restoreAutoBackup() {
       const text = localStorage.getItem(PREFIX + 'backup_auto');

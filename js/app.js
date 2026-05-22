@@ -6,7 +6,6 @@ const App = (() => {
   let currentSection = 'dashboard';
   let sidebarOpen = true;
 
-  // ── AUTH ──
   function login() {
     const user = document.getElementById('login-user').value.trim();
     const pass = document.getElementById('login-pass').value.trim();
@@ -16,6 +15,7 @@ const App = (() => {
       return;
     }
     currentUser = found;
+    localStorage.setItem('agavewms_currentUser', JSON.stringify(found));
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('user-name-display').textContent = found.name;
@@ -28,6 +28,7 @@ const App = (() => {
 
   function logout() {
     currentUser = null;
+    localStorage.removeItem('agavewms_currentUser');
     document.getElementById('app').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('login-user').value = '';
@@ -215,10 +216,22 @@ const App = (() => {
   }
 
   function handleBarcodeScanned(code) {
+    if (currentSection === 'inbound') {
+      if (typeof Sections.handleInboundBarcode === 'function') {
+        Sections.handleInboundBarcode(code);
+        return;
+      }
+    }
+    if (currentSection === 'outbound') {
+      if (typeof Sections.handleOutboundBarcode === 'function') {
+        Sections.handleOutboundBarcode(code);
+        return;
+      }
+    }
+
     const p = DB.Products.findByCode(code);
     if (p) {
       toast(`Rilevato codice a barre: ${code} (${p.name})`, 'info');
-      // Open action modal
       openModal('Prodotto Rilevato', `
         <div style="text-align:center;padding:10px 0">
           <div style="font-size:2rem;margin-bottom:8px">📦</div>
@@ -236,45 +249,57 @@ const App = (() => {
       toast(`Codice non trovato: ${code}`, 'warning');
       openModal('Nuovo Prodotto da Barcode', `
         <p style="color:var(--text2)">Nessun prodotto trovato con codice/barcode <b>${escape(code)}</b>.</p>
-        <p style="color:var(--text2);margin-top:8px">Come vuoi procedere?</p>
+        <p style="color:var(--text2);margin-top:8px">Vuoi registrarlo come nuovo prodotto?</p>
       `, `
         <button class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>
-        <button class="btn btn-primary" onclick="App.closeModal();App.navigate('products');Sections.openProductForm({barcode:'${escape(code)}'})">Crea Manualmente</button>
-        <button class="btn btn-warning" onclick="App.closeModal();Sections.autoEnrichProduct('${escape(code)}')">✨ Chiedi all'AI</button>
+        <button class="btn btn-primary" onclick="App.closeModal();App.navigate('products');Sections.openProductForm({barcode:'${escape(code)}'})">➕ Crea Prodotto</button>
       `);
     }
   }
 
-  // ── AI CHATBOT ──
-  function toggleChat() {
-    const p = document.getElementById('ai-chat-panel');
-    p.classList.toggle('hidden');
-    if (!p.classList.contains('hidden')) {
-      setTimeout(() => document.getElementById('ai-chat-input-field').focus(), 100);
+  // ── SESSION & STANDALONE ROUTING ──
+  function initSession() {
+    let savedUser = null;
+    try { savedUser = JSON.parse(localStorage.getItem('agavewms_currentUser')); } catch (e) {}
+    if (!savedUser) {
+      savedUser = { id: 1, username: 'admin', name: 'Amministratore', role: 'admin' };
+      localStorage.setItem('agavewms_currentUser', JSON.stringify(savedUser));
     }
-  }
+    currentUser = savedUser;
 
-  function sendChat() {
-    const input = document.getElementById('ai-chat-input-field');
-    const msg = input.value.trim();
-    if (!msg) return;
-    
-    const body = document.getElementById('ai-chat-body');
-    body.innerHTML += `<div class="ai-msg user">${escape(msg)}</div>`;
-    input.value = '';
-    body.scrollTop = body.scrollHeight;
+    const urlParams = new URLSearchParams(window.location.search);
+    const standalone = urlParams.get('standalone') === 'true';
+    const view = urlParams.get('view');
 
-    const typingId = 'typing-' + Date.now();
-    body.innerHTML += `<div id="${typingId}" class="ai-msg ai" style="color:var(--text2)">Sto analizzando...</div>`;
-    body.scrollTop = body.scrollHeight;
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('user-name-display').textContent = currentUser.name;
+      document.getElementById('user-role-display').textContent = DB.Users.ROLES[currentUser.role] || currentUser.role;
+      document.getElementById('user-avatar').textContent = currentUser.name[0].toUpperCase();
+      applyTheme(DB.Settings.get().theme || 'dark');
 
-    setTimeout(() => {
-      const el = document.getElementById(typingId);
-      if (el) el.remove();
-      const answer = DB.AI.ask(msg);
-      body.innerHTML += `<div class="ai-msg ai">${answer}</div>`;
-      body.scrollTop = body.scrollHeight;
-    }, 800);
+      if (standalone) {
+        document.body.classList.add('standalone-mode');
+        const sidebar = document.getElementById('sidebar');
+        const topbar = document.getElementById('topbar');
+        if (sidebar) sidebar.style.display = 'none';
+        if (topbar) topbar.style.display = 'none';
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+          mainContent.style.marginLeft = '0';
+          mainContent.style.padding = '16px';
+          mainContent.style.width = '100%';
+        }
+      }
+
+      const targetView = view || 'dashboard';
+      navigate(targetView);
+      updateNotifications();
+
+      // Check auto download backup
+      DB.Backup.checkAutoDownloadBackup();
+    });
   }
 
   // ── KEY LISTENERS ──
@@ -297,8 +322,9 @@ const App = (() => {
   document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key==='Enter') login(); });
   document.getElementById('login-user').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-pass').focus(); });
 
-  // Init barcode scanner detector
+  // Initialize
   initBarcodeScanner();
+  initSession();
 
-  return { login, logout, getUser, navigate, toggleTheme, toggleSidebar, globalSearch, toast, openModal, closeModal, confirm, updateNotifications, toggleNotifications, fmt, fmtDate, fmtDateTime, escape, handleBarcodeScanned, toggleChat, sendChat };
+  return { login, logout, getUser, navigate, toggleTheme, toggleSidebar, globalSearch, toast, openModal, closeModal, confirm, updateNotifications, toggleNotifications, fmt, fmtDate, fmtDateTime, escape, handleBarcodeScanned };
 })();
