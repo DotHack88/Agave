@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Agave – Backup online</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>🗄️ Backup di Agave</h1>
+
+    <!-- ==== Login (mock) ==== -->
+    <section id="login">
+      <h2>Login</h2>
+      <input type="text" id="username" placeholder="Nome utente">
+      <button id="loginBtn">Accedi</button>
+    </section>
+
+    <!-- ==== Dashboard ==== -->
+    <section id="dashboard" class="hidden">
+      <h2>Impostazioni</h2>
+
+      <div class="setting">
+        <label>Cartella di destinazione:</label>
+        <button id="chooseFolderBtn">Scegli cartella</button>
+        <span id="chosenFolder">Nessuna cartella selezionata</span>
+      </div>
+
+      <button id="startBackupBtn" disabled>Crea backup</button>
+
+      <p id="status"></p>
+    </section>
+  </main>
+
+  <script>
+    const loginSection = document.getElementById('login');
+    const dashboard = document.getElementById('dashboard');
+    const loginBtn = document.getElementById('loginBtn');
+    const username = document.getElementById('username');
+
+    const chooseFolderBtn = document.getElementById('chooseFolderBtn');
+    const chosenFolderSpan = document.getElementById('chosenFolder');
+    const startBackupBtn = document.getElementById('startBackupBtn');
+    const statusP = document.getElementById('status');
+
+    let folderHandle = null;      // Riferimento alla cartella scelta
+    let savedFolderName = null;   // Nome della cartella salvato in localStorage
+
+    // ---------- Mock login ----------
+    loginBtn.addEventListener('click', () => {
+      if (!username.value.trim()) {
+        alert('Inserisci il nome utente');
+        return;
+      }
+      loginSection.classList.add('hidden');
+      dashboard.classList.remove('hidden');
+
+      // Carica eventuale impostazione salvata
+      const saved = localStorage.getItem('backupFolder');
+      if (saved) {
+        savedFolderName = saved;
+        chosenFolderSpan.textContent = saved;
+        startBackupBtn.disabled = false;
+      }
+    });
+
+    // ---------- Scegli cartella (File System Access API) ----------
+    chooseFolderBtn.addEventListener('click', async () => {
+      try {
+        folderHandle = await window.showDirectoryPicker();
+        chosenFolderSpan.textContent = folderHandle.name;
+        startBackupBtn.disabled = false;
+        // Salva il nome della cartella (solo nome, non il percorso completo per motivi di privacy)
+        localStorage.setItem('backupFolder', folderHandle.name);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    // ---------- Avvia backup ----------
+    startBackupBtn.addEventListener('click', async () => {
+      if (!folderHandle) return;
+      statusP.textContent = 'Generazione backup in corso...';
+      startBackupBtn.disabled = true;
+
+      // Invia al server il nome della cartella (usato solo a scopo dimostrativo)
+      const response = await fetch('/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destFolder: folderHandle.name })
+      });
+
+      if (!response.ok) {
+        statusP.textContent = `❌ Errore: ${response.statusText}`;
+        startBackupBtn.disabled = false;
+        return;
+      }
+
+      // Scarica il file ZIP
+      const blob = await response.blob();
+
+      // Salva il file nella cartella scelta dall'utente
+      const fileHandle = await folderHandle.getFileHandle('backup.zip', { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      statusP.textContent = `✅ Backup salvato in "${folderHandle.name}"`;
+      startBackupBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
