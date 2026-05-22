@@ -83,12 +83,14 @@
       statusP.textContent = 'Generazione backup in corso...';
       startBackupBtn.disabled = true;
 
-      // Invia al server il nome della cartella (usato solo a scopo dimostrativo)
-      const response = await fetch('/backup', {
+      // Sostituisci il fetch verso il server locale con quello di Vercel
+      const response = await fetch('https://agave-five.vercel.app/api/backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // opzionalmente puoi inviare il nome della cartella scelta (solo per log)
         body: JSON.stringify({ destFolder: folderHandle.name })
       });
+
 
       if (!response.ok) {
         statusP.textContent = `❌ Errore: ${response.statusText}`;
