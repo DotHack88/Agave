@@ -195,7 +195,7 @@ const DB = (() => {
   // ── USERS ──
   const Users = {
     all() { return load(KEYS.users) || []; },
-    find(id) { return this.all().find(u=>u.id===id); },
+    find(id) { return this.all().find(u=>String(u.id)===String(id)); },
     authenticate(username, password) { return this.all().find(u=>u.username===username&&u.password===password&&u.active); },
     create(data) {
       const id = nextId('USR');
@@ -204,12 +204,12 @@ const DB = (() => {
     },
     update(id, data) {
       const all = this.all();
-      const i = all.findIndex(u=>u.id===id);
+      const i = all.findIndex(u=>String(u.id)===String(id));
       if (i<0) return null;
-      all[i] = {...all[i],...data,id};
+      all[i] = {...all[i],...data,id:all[i].id};
       save(KEYS.users, all); return all[i];
     },
-    delete(id) { save(KEYS.users, this.all().filter(u=>u.id!==id)); },
+    delete(id) { save(KEYS.users, this.all().filter(u=>String(u.id)!==String(id))); },
     ROLES: { admin:'Amministratore', warehouse:'Magazziniere', operator:'Operatore', viewer:'Visualizzatore' },
     canEdit(user) { return true; },
     canDelete(user) { return true; },

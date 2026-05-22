@@ -218,6 +218,7 @@ Object.assign(Sections, {
         <td><span class="badge badge-primary">${DB.Users.ROLES[u.role]||u.role}</span></td>
         <td><span class="badge ${u.active?'badge-green':'badge-gray'}">${u.active?'Attivo':'Disattivo'}</span></td>
         <td><div class="td-actions">
+          ${canDel ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="Sections._openUserForm(${u.id})" title="Modifica">✏️</button>` : ''}
           ${canDel&&u.username!=='admin'?`<button class="btn btn-ghost btn-sm btn-icon" onclick="Sections._deleteUser(${u.id})" title="Elimina">🗑️</button>`:''}
         </div></td>
       </tr>`).join('')}
@@ -284,31 +285,42 @@ Object.assign(Sections, {
     r.readAsText(file);
   },
 
-  _openUserForm() {
-    App.openModal('Nuovo Utente', `
-      <div class="form-group"><label>Username *</label><input id="uf-user" placeholder="username"/></div>
-      <div class="form-group"><label>Password *</label><input id="uf-pass" type="password" placeholder="••••••"/></div>
-      <div class="form-group"><label>Nome Completo *</label><input id="uf-name" placeholder="Nome Cognome"/></div>
+  _openUserForm(id = null) {
+    let u = { username:'', password:'', name:'', role:'operator' };
+    if (id) {
+      const found = DB.Users.find(id);
+      if (found) u = found;
+    }
+    App.openModal(id ? 'Modifica Utente' : 'Nuovo Utente', `
+      <div class="form-group"><label>Username *</label><input id="uf-user" value="${App.escape(u.username)}" placeholder="username" ${id && u.username==='admin' ? 'disabled' : ''}/></div>
+      <div class="form-group"><label>Password *</label><input id="uf-pass" value="${App.escape(u.password)}" type="password" placeholder="••••••"/></div>
+      <div class="form-group"><label>Nome Completo *</label><input id="uf-name" value="${App.escape(u.name)}" placeholder="Nome Cognome"/></div>
       <div class="form-group"><label>Ruolo</label>
-        <select id="uf-role">
-          <option value="operator">Operatore</option>
-          <option value="warehouse">Magazziniere</option>
-          <option value="viewer">Visualizzatore</option>
-          <option value="admin">Admin</option>
+        <select id="uf-role" ${id && u.username==='admin' ? 'disabled' : ''}>
+          <option value="operator" ${u.role==='operator'?'selected':''}>Operatore</option>
+          <option value="warehouse" ${u.role==='warehouse'?'selected':''}>Magazziniere</option>
+          <option value="viewer" ${u.role==='viewer'?'selected':''}>Visualizzatore</option>
+          <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
         </select>
       </div>`,
       `<button class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>
-       <button class="btn btn-primary" onclick="Sections._saveUser()">Salva</button>`);
+       <button class="btn btn-primary" onclick="Sections._saveUser(${id ? `'${id}'` : 'null'})">Salva</button>`);
   },
 
-  _saveUser() {
+  _saveUser(id = null) {
     const username = document.getElementById('uf-user').value.trim();
     const password = document.getElementById('uf-pass').value.trim();
     const name = document.getElementById('uf-name').value.trim();
     const role = document.getElementById('uf-role').value;
     if (!username||!password||!name) { App.toast('Compila tutti i campi','error'); return; }
-    DB.Users.create({ username, password, name, role });
-    App.toast('Utente creato','success');
+    
+    if (id) {
+      DB.Users.update(id, { username, password, name, role });
+      App.toast('Utente aggiornato','success');
+    } else {
+      DB.Users.create({ username, password, name, role });
+      App.toast('Utente creato','success');
+    }
     App.closeModal();
     Sections.renderSettings();
   },
