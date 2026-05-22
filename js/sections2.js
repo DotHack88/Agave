@@ -130,7 +130,7 @@ Object.assign(Sections, {
     <div class="form-group" style="position:relative">
       <label><b>Cerca o Scansiona Prodotto</b></label>
       <input type="text" id="ib-search-input" placeholder="Scansiona barcode o digita nome, marca, modello..." 
-        oninput="Sections.searchInboundProd(this.value)" autocomplete="off" class="form-control" style="width:100%"/>
+        oninput="Sections.searchInboundProd(this.value)" onkeydown="if(event.key==='Enter'){Sections.handleInboundBarcode(this.value);this.value='';document.getElementById('ib-search-results').classList.add('hidden');}" autocomplete="off" class="form-control" style="width:100%"/>
       <div id="ib-search-results" class="search-results hidden" style="position:absolute; width:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm)"></div>
     </div>
 
@@ -272,7 +272,7 @@ Object.assign(Sections, {
     <div class="form-group" style="position:relative">
       <label><b>Cerca o Scansiona Prodotto</b></label>
       <input type="text" id="ob-search-input" placeholder="Scansiona barcode o digita nome, marca, modello..." 
-        oninput="Sections.searchOutboundProd(this.value)" autocomplete="off" class="form-control" style="width:100%"/>
+        oninput="Sections.searchOutboundProd(this.value)" onkeydown="if(event.key==='Enter'){Sections.handleOutboundBarcode(this.value);this.value='';document.getElementById('ob-search-results').classList.add('hidden');}" autocomplete="off" class="form-control" style="width:100%"/>
       <div id="ob-search-results" class="search-results hidden" style="position:absolute; width:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm)"></div>
     </div>
 

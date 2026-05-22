@@ -117,38 +117,14 @@ Object.assign(Sections, {
   renderReports() {
     const el = document.getElementById('section-reports');
     const prods = DB.Products.active();
-    const totalVal = DB.Products.totalValue();
-    const totalQty = DB.Products.totalQty();
     const low = DB.Products.lowStock();
     const topMoved = DB.Movements.byProduct().slice(0,5);
-    const monthly = DB.Movements.monthlyStats(6);
-    const cats = {};
-    prods.forEach(p => { cats[p.category||'Altro']=(cats[p.category||'Altro']||0)+1; });
 
     el.innerHTML = `
 <div class="page-header"><h1>Report & Statistiche</h1>
   <div class="actions"><button class="btn btn-ghost" onclick="DB.Backup.export()">💾 Backup Dati</button></div>
 </div>
-<div class="stats-grid" style="margin-bottom:20px">
-  <div class="stat-card"><div class="stat-icon primary"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
-    <div class="stat-info"><div class="stat-value">${prods.length}</div><div class="stat-label">Prodotti attivi</div></div></div>
-  <div class="stat-card"><div class="stat-icon green"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-    <div class="stat-info"><div class="stat-value">${App.fmt(totalVal,0)}</div><div class="stat-label">Valore magazzino</div></div></div>
-  <div class="stat-card"><div class="stat-icon yellow"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
-    <div class="stat-info"><div class="stat-value">${low.length}</div><div class="stat-label">Sotto scorta minima</div></div></div>
-  <div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div>
-    <div class="stat-info"><div class="stat-value">${DB.Movements.all().length}</div><div class="stat-label">Movimenti totali</div></div></div>
-</div>
-<div class="grid-2" style="margin-bottom:16px">
-  <div class="card">
-    <div class="card-header"><span class="card-title">📈 Entrate/Uscite mensili</span></div>
-    <div class="chart-wrap"><canvas id="rep-monthly"></canvas></div>
-  </div>
-  <div class="card">
-    <div class="card-header"><span class="card-title">🗂 Distribuzione categorie</span></div>
-    <div class="chart-wrap"><canvas id="rep-cats"></canvas></div>
-  </div>
-</div>
+
 <div class="grid-2">
   <div class="card">
     <div class="card-header"><span class="card-title">🏆 Prodotti più movimentati</span></div>
@@ -178,15 +154,6 @@ Object.assign(Sections, {
     </table></div>` : '<div class="empty-state" style="padding:30px"><div class="es-icon">✅</div><h3>Tutte le scorte OK</h3></div>'}
   </div>
 </div>`;
-
-    setTimeout(() => {
-      Charts.bar('rep-monthly', {
-        labels: monthly.map(m=>m.label),
-        datasets:[{label:'Entrate',values:monthly.map(m=>m.in),color:'#10b981'},{label:'Uscite',values:monthly.map(m=>m.out),color:'#ef4444'}]
-      });
-      const catKeys = Object.keys(cats).slice(0,6);
-      Charts.donut('rep-cats', { labels:catKeys, values:catKeys.map(k=>cats[k]) });
-    }, 50);
   },
 
   renderSettings() {
@@ -222,18 +189,18 @@ Object.assign(Sections, {
       </div>
     </div>
     <div class="settings-section">
-      <h3>Dati</h3>
+      <h3>Backup Dati</h3>
       <div class="settings-row">
-        <div><div class="settings-label">Esporta Backup</div><div class="settings-sub">Salva tutti i dati in formato JSON</div></div>
-        <button class="btn btn-ghost btn-sm" onclick="DB.Backup.export()">💾 Backup</button>
+        <div><div class="settings-label">Cartella di Backup</div><div class="settings-sub" id="backup-folder-status">Percorso non impostato</div></div>
+        <button class="btn btn-primary btn-sm" onclick="Sections._selectBackupFolder()">📁 Scegli Cartella</button>
       </div>
       <div class="settings-row">
-        <div><div class="settings-label">Importa Backup</div><div class="settings-sub">Ripristina da file JSON</div></div>
+        <div><div class="settings-label">Backup Manuale</div><div class="settings-sub">Salva i dati nella cartella scelta</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="Sections._forceBackup()">💾 Esegui Ora</button>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-label">Importa Dati JSON</div><div class="settings-sub">Ripristina da un file di backup JSON</div></div>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer">📂 Importa<input type="file" accept=".json" style="display:none" onchange="Sections._importBackup(this)"/></label>
-      </div>
-      <div class="settings-row">
-        <div><div class="settings-label">Ripristina Backup Automatico</div><div class="settings-sub" id="backup-auto-time-label">Nessun backup automatico disponibile</div></div>
-        <button class="btn btn-warning btn-sm" onclick="Sections._restoreAutoBackup()">🔄 Ripristina</button>
       </div>
     </div>
   </div>
@@ -260,13 +227,37 @@ Object.assign(Sections, {
 </div>
 </div>`;
 
-    setTimeout(() => {
-      const time = DB.Backup.getAutoBackupTime();
-      const label = document.getElementById('backup-auto-time-label');
-      if (label) {
-        label.innerHTML = time ? `Ultimo salvataggio: <b>${App.fmtDateTime(time)}</b>` : 'Nessun backup automatico disponibile';
+    setTimeout(async () => {
+      const handle = await DB.LocalBackup.getDirectoryHandle();
+      const lbl = document.getElementById('backup-folder-status');
+      if (lbl) {
+        if (handle) {
+          lbl.innerHTML = `<span style="color:var(--green)">✅ ${handle.name}</span><br>Backup automatico alle 19:00 attivo.`;
+        } else {
+          lbl.innerHTML = `<span style="color:var(--red)">⚠️ Nessuna cartella. Backup disattivato.</span>`;
+        }
       }
-    }, 20);
+    }, 50);
+  },
+
+  async _selectBackupFolder() {
+    if (!window.showDirectoryPicker) {
+      App.toast('Il tuo browser non supporta la selezione della cartella. Usa Chrome o Edge.', 'error');
+      return;
+    }
+    try {
+      const handle = await window.showDirectoryPicker();
+      await DB.LocalBackup.saveDirectoryHandle(handle);
+      App.toast('Cartella di backup impostata con successo!', 'success');
+      this.renderSettings();
+    } catch (e) {
+      App.toast('Selezione cartella annullata.', 'warning');
+    }
+  },
+
+  async _forceBackup() {
+    App.toast('Avvio backup in corso...', 'info');
+    await DB.LocalBackup.executeBackup(false);
   },
 
   _saveSetting(key, val) { DB.Settings.set({[key]:val}); App.toast('Impostazione salvata','success'); },

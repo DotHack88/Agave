@@ -86,9 +86,13 @@ const DB = (() => {
     search(q) {
       const s = q.toLowerCase();
       return this.active().filter(p =>
-        p.name.toLowerCase().includes(s) || p.code.toLowerCase().includes(s) ||
-        p.barcode.includes(s) || p.category.toLowerCase().includes(s) ||
-        p.brand.toLowerCase().includes(s) || p.supplier.toLowerCase().includes(s)
+        (p.name || '').toLowerCase().includes(s) || 
+        (p.code || '').toLowerCase().includes(s) ||
+        (p.barcode || '').includes(s) || 
+        (p.category || '').toLowerCase().includes(s) ||
+        (p.brand || '').toLowerCase().includes(s) || 
+        (p.model || '').toLowerCase().includes(s) || 
+        (p.supplier || '').toLowerCase().includes(s)
       );
     },
     create(data) {
@@ -126,7 +130,18 @@ const DB = (() => {
     totalQty() { return this.active().reduce((s,p) => s + (p.qty || 0), 0); },
     filter(opts = {}) {
       let arr = this.active();
-      if (opts.q) { const s=opts.q.toLowerCase(); arr=arr.filter(p=>p.name.toLowerCase().includes(s)||p.code.toLowerCase().includes(s)||p.barcode?.includes(s)||(p.brand&&p.brand.toLowerCase().includes(s))||(p.model&&p.model.toLowerCase().includes(s))); }
+      if (opts.q) {
+        const s = opts.q.toLowerCase();
+        arr = arr.filter(p =>
+          (p.name || '').toLowerCase().includes(s) ||
+          (p.code || '').toLowerCase().includes(s) ||
+          (p.barcode || '').includes(s) ||
+          (p.brand || '').toLowerCase().includes(s) ||
+          (p.model || '').toLowerCase().includes(s) ||
+          (p.category || '').toLowerCase().includes(s) ||
+          (p.supplier || '').toLowerCase().includes(s)
+        );
+      }
       if (opts.category) arr = arr.filter(p=>p.category===opts.category);
       if (opts.brand) arr = arr.filter(p=>p.brand===opts.brand);
       if (opts.supplier) arr = arr.filter(p=>p.supplier===opts.supplier);
@@ -277,115 +292,154 @@ const DB = (() => {
     }
   };
 
-  // ── AI & SMART FEATURES ──
-  const AI = {
-    getInsights() {
-      const prods = Products.active();
-      const moves = Movements.all();
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString();
-      
-      const insights = [];
-      
-      const sales = {};
-      moves.filter(m => m.type === 'out' && m.ts >= thirtyDaysAgo).forEach(m => {
-        sales[m.productId] = (sales[m.productId] || 0) + m.qty;
+  // ── LOCAL BACKUP MANAGEMENT ──
+  const LocalBackup = {
+    async saveDirectoryHandle(handle) {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('agave_backup_db', 1);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore('handles');
+        };
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('handles', 'readwrite');
+          const store = tx.objectStore('handles');
+          const req = store.put(handle, 'backup_dir');
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => reject(req.error);
+        };
+        request.onerror = () => reject(request.error);
       });
+    },
 
-      let maxSales = 0;
-      let topProd = null;
-      prods.forEach(p => {
-        const sold = sales[p.id] || 0;
-        if (sold > maxSales) { maxSales = sold; topProd = p; }
-        
-        if (sold > 0 && p.qty > 0 && p.qty <= p.qtyMin * 2) {
-          const dailyRate = sold / 30;
-          const daysLeft = Math.round(p.qty / dailyRate);
-          if (daysLeft > 0 && daysLeft < 15) {
-            insights.push({ type: 'warning', icon: '⏳', text: `<b>${p.name}</b> si esaurirà tra circa <b>${daysLeft} giorni</b> al ritmo attuale.` });
+    async getDirectoryHandle() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('agave_backup_db', 1);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore('handles');
+        };
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('handles', 'readonly');
+          const store = tx.objectStore('handles');
+          const req = store.get('backup_dir');
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => reject(req.error);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    },
+
+    async verifyPermission(fileHandle, readWrite) {
+      const options = {};
+      if (readWrite) {
+        options.mode = 'readwrite';
+      }
+      if ((await fileHandle.queryPermission(options)) === 'granted') {
+        return true;
+      }
+      if ((await fileHandle.requestPermission(options)) === 'granted') {
+        return true;
+      }
+      return false;
+    },
+
+    async executeBackup(isAuto = false) {
+      const handle = await this.getDirectoryHandle();
+      const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      
+      let gotPermission = false;
+      if (handle) {
+        try {
+          gotPermission = await this.verifyPermission(handle, true);
+        } catch (e) {
+          console.warn("Could not request directory permissions:", e);
+        }
+      }
+
+      const dbData = {
+        version: '1.0',
+        exported: new Date().toISOString(),
+        products: Products.all(),
+        movements: Movements.all(),
+        users: Users.all(),
+        settings: Settings.get()
+      };
+
+      if (handle && gotPermission) {
+        try {
+          const jsonFileHandle = await handle.getFileHandle(`agave_db_backup_${timestamp}.json`, { create: true });
+          const jsonWritable = await jsonFileHandle.createWritable();
+          await jsonWritable.write(JSON.stringify(dbData, null, 2));
+          await jsonWritable.close();
+
+          try {
+            const response = await fetch(`${window.location.origin}/api/backup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ timestamp: new Date().toISOString() })
+            });
+            if (response.ok) {
+              const zipBlob = await response.blob();
+              const zipFileHandle = await handle.getFileHandle(`agave_app_backup_${timestamp}.zip`, { create: true });
+              const zipWritable = await zipFileHandle.createWritable();
+              await zipWritable.write(zipBlob);
+              await zipWritable.close();
+            }
+          } catch (err) {
+            console.warn("Vercel api/backup zip skipped:", err);
+          }
+
+          if (!isAuto) {
+            App.toast(`💾 Backup salvato in: ${handle.name}`, 'success');
+          }
+          return true;
+        } catch (err) {
+          console.error("Backup to folder failed:", err);
+          if (!isAuto) {
+            App.toast(`❌ Errore nel salvataggio del backup: ${err.message}`, 'error');
           }
         }
-      });
-
-      if (topProd && maxSales > 0) {
-         insights.push({ type: 'success', icon: '🔥', text: `<b>${topProd.name}</b> è il prodotto del momento (${maxSales} vendite in 30gg).` });
       }
 
-      const ninetyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 90)).toISOString();
-      const deadStock = prods.filter(p => p.qty > 0 && !moves.some(m => m.productId === p.id && m.ts >= ninetyDaysAgo));
-      if (deadStock.length > 0) {
-        insights.push({ type: 'danger', icon: '🧊', text: `Hai <b>${deadStock.length} prodotti</b> fermi da oltre 90 giorni. Valuta una promozione.` });
-      }
+      if (!isAuto) {
+        try {
+          const blob = new Blob([JSON.stringify(dbData, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `agave_db_backup_${dateStr}.json`;
+          a.click();
+          URL.revokeObjectURL(a.href);
 
-      return insights;
+          App.toast('💾 Backup scaricato nella cartella dei download', 'success');
+          return true;
+        } catch (err) {
+          console.error("Browser download fallback failed:", err);
+          App.toast('❌ Errore nel download del backup', 'error');
+          return false;
+        }
+      }
+      return false;
     },
 
-    ask(query) {
-      const q = query.toLowerCase();
+    async checkAutoBackup() {
+      const handle = await this.getDirectoryHandle();
+      if (!handle) return;
+
+      const nowVal = new Date();
+      const hours = nowVal.getHours();
       
-      if (q.includes('vendut') && q.includes('meno')) {
-         const moves = Movements.filter({type:'out'});
-         const sales = {};
-         Products.active().forEach(p => sales[p.id] = 0);
-         moves.forEach(m => { if (sales[m.productId] !== undefined) sales[m.productId] += m.qty; });
-         const sorted = Object.keys(sales).map(id => ({name: Products.find(Number(id))?.name, sold: sales[id]})).sort((a,b) => a.sold - b.sold).slice(0, 3);
-         let html = `Ecco i prodotti meno venduti:<br><br>`;
-         sorted.forEach(p => html += `• <b>${p.name}</b>: ${p.sold} unità<br>`);
-         return html;
+      if (hours >= 19) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const lastBackupDate = localStorage.getItem('agavewms_last_auto_backup_date');
+        
+        if (lastBackupDate !== todayStr) {
+          localStorage.setItem('agavewms_last_auto_backup_date', todayStr);
+          App.toast('⏰ Avvio backup automatico...', 'info');
+          await this.executeBackup(true);
+        }
       }
-      
-      if (q.includes('profitto') || q.includes('margine')) {
-         const cats = Products.categories();
-         const cat = cats.find(c => q.includes(c.toLowerCase()));
-         let targetProds = Products.active();
-         let scope = "tutto il magazzino";
-         if (cat) {
-            targetProds = targetProds.filter(p => p.category === cat);
-            scope = `la categoria <b>${cat}</b>`;
-         }
-         let totalBuy = 0, totalSell = 0;
-         targetProds.forEach(p => {
-           if (p.priceBuy > 0 && p.priceSell > 0) {
-             totalBuy += (p.priceBuy * p.qty);
-             totalSell += (p.priceSell * p.qty);
-           }
-         });
-         if (totalBuy === 0) return `Non ho dati di costo sufficienti per calcolare il margine.`;
-         const margin = ((totalSell - totalBuy) / totalSell * 100).toFixed(1);
-         return `Il margine di profitto medio (sul valore a stock) per ${scope} è del <b>${margin}%</b>.`;
-      }
-
-      if (q.includes('quanti') || q.includes('scorte') || q.includes('disponibil')) {
-         const words = q.split(' ');
-         const searchWord = words.find(w => w.length > 3 && !['quanti','scorte','sono','della','delle','degli','disponibili'].includes(w));
-         if (searchWord) {
-            const res = Products.search(searchWord);
-            if (res.length > 0) {
-               return `Ne abbiamo <b>${res[0].qty}</b> pezzi di <b>${res[0].name}</b> in magazzino.`;
-            }
-         }
-      }
-
-      return "Scusa, non ho capito la domanda. Prova a chiedermi: 'Quali sono i prodotti meno venduti?' oppure 'Mostrami il margine di profitto'.";
-    },
-
-    enrichProduct(barcode) {
-      return new Promise(resolve => {
-        setTimeout(() => {
-          const db = [
-            { code: '8001', name: 'Olio Essenziale di Lavanda 10ml', category: 'Oli Essenziali', desc: 'Puro olio essenziale estratto a vapore. Proprietà rilassanti.', notes: 'Benefici: Ottimo per ansia, insonnia e per profumare gli ambienti.' },
-            { code: '8002', name: 'Tisana Drenante Bio', category: 'Tisane', desc: 'Miscela di erbe officinali biologiche per favorire il drenaggio dei liquidi.', notes: 'Contiene: Betulla, Ortosiphon, Equiseto.' },
-            { code: '8003', name: "Crema Viso Antiage all'Argan", category: 'Cosmesi Naturale', desc: 'Crema idratante e rimpolpante per pelli mature.', notes: 'Uso: Applicare mattina e sera su viso e collo puliti.' }
-          ];
-          const match = db.find(d => barcode.startsWith(d.code)) || {
-            name: 'Prodotto Botanico AI (' + barcode + ')',
-            category: 'Rimedi Naturali',
-            desc: 'Prodotto generato e arricchito tramite AI.',
-            notes: 'Verificare le informazioni inserite automaticamente.'
-          };
-          resolve(match);
-        }, 1200);
-      });
     }
   };
 
@@ -509,5 +563,5 @@ const DB = (() => {
 
   init();
   Backup.dailyBackup();
-  return { Products, Movements, Users, Settings, CSV, Backup, AI };
+  return { Products, Movements, Users, Settings, CSV, Backup, LocalBackup };
 })();

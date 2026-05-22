@@ -106,8 +106,8 @@ input[type=file] { padding:7px 10px; background:var(--bg3); border:1px solid var
 .btn-logout:hover { color:var(--red); }
 
 /* ── MAIN CONTENT ── */
-.main-content { flex:1; margin-left:var(--sidebar-w); display:flex; flex-direction:column; min-height:100vh; transition:margin var(--transition); }
-.main-content.expanded { margin-left:0; }
+.main-content { width:calc(100vw - var(--sidebar-w)); margin-left:var(--sidebar-w); display:flex; flex-direction:column; min-height:100vh; transition:all var(--transition); }
+.main-content.expanded { margin-left:0; width: 100vw; }
 
 /* ── TOPBAR ── */
 .topbar { height:var(--topbar-h); background:var(--bg2); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 24px; position:sticky; top:0; z-index:100; }

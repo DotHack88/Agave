@@ -67,8 +67,6 @@ const Sections = (() => {
       prodFilters.sortKey = key;
       prodFilters.sortOrder = 'asc';
     }
-    const el = document.getElementById('section-products');
-    if (el) el.innerHTML = ''; // Force structure rebuild to update arrow indicators
     renderProducts();
   }
 
@@ -110,9 +108,7 @@ const Sections = (() => {
 <div class="filters-bar">
   <input type="text" id="prod-filter-q" placeholder="🔍 Cerca per nome, codice, barcode, marca o modello..." value="${prodFilters.q}"
     oninput="Sections.setProdFilter('q',this.value)" style="flex:1;min-width:200px"/>
-  <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer">
-    <input type="checkbox" id="prod-filter-lowStock" ${prodFilters.lowStock?'checked':''} onchange="Sections.setProdFilter('lowStock',this.checked)"/> Solo prodotti sotto scorta
-  </label>
+  <button id="prod-filter-lowStock-btn" class="btn ${prodFilters.lowStock ? 'btn-warning' : 'btn-ghost'} btn-sm" onclick="Sections.toggleLowStockFilter()">⚠️ Sotto Scorta</button>
   <button class="btn btn-ghost btn-sm" onclick="Sections.resetProdFilters()">Reset</button>
 </div>
 <div class="table-wrap">
@@ -131,6 +127,17 @@ const Sections = (() => {
 <tbody id="products-tbody"></tbody>
 </table>
 </div>`;
+    } else {
+      // Update headers in-place to keep sorting arrow correct without input focus loss
+      const headers = el.querySelectorAll('thead th');
+      if (headers.length >= 6) {
+        headers[0].innerHTML = `Codice ${getSortArrow('code')}`;
+        headers[1].innerHTML = `Prodotto ${getSortArrow('name')}`;
+        headers[2].innerHTML = `Marca ${getSortArrow('brand')}`;
+        headers[3].innerHTML = `Modello ${getSortArrow('model')}`;
+        headers[4].innerHTML = `Giacenza ${getSortArrow('qty')}`;
+        headers[5].innerHTML = `Scorta min. ${getSortArrow('qtyMin')}`;
+      }
     }
 
     const tbody = document.getElementById('products-tbody');
@@ -168,6 +175,22 @@ const Sections = (() => {
     prodFilters[key] = val;
     renderProducts();
   }
+
+  function toggleLowStockFilter() {
+    prodFilters.lowStock = !prodFilters.lowStock;
+    const btn = document.getElementById('prod-filter-lowStock-btn');
+    if (btn) {
+      if (prodFilters.lowStock) {
+        btn.classList.remove('btn-ghost');
+        btn.classList.add('btn-warning');
+      } else {
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-ghost');
+      }
+    }
+    renderProducts();
+  }
+
   function resetProdFilters() {
     prodFilters = { q:'', lowStock:false, sortKey:'name', sortOrder:'asc' };
     const el = document.getElementById('section-products');

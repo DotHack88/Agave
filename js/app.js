@@ -261,10 +261,6 @@ const App = (() => {
   function initSession() {
     let savedUser = null;
     try { savedUser = JSON.parse(localStorage.getItem('agavewms_currentUser')); } catch (e) {}
-    if (!savedUser) {
-      savedUser = { id: 1, username: 'admin', name: 'Amministratore', role: 'admin' };
-      localStorage.setItem('agavewms_currentUser', JSON.stringify(savedUser));
-    }
     currentUser = savedUser;
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -272,33 +268,48 @@ const App = (() => {
     const view = urlParams.get('view');
 
     window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('login-screen').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      document.getElementById('user-name-display').textContent = currentUser.name;
-      document.getElementById('user-role-display').textContent = DB.Users.ROLES[currentUser.role] || currentUser.role;
-      document.getElementById('user-avatar').textContent = currentUser.name[0].toUpperCase();
       applyTheme(DB.Settings.get().theme || 'dark');
 
-      if (standalone) {
-        document.body.classList.add('standalone-mode');
-        const sidebar = document.getElementById('sidebar');
-        const topbar = document.getElementById('topbar');
-        if (sidebar) sidebar.style.display = 'none';
-        if (topbar) topbar.style.display = 'none';
-        const mainContent = document.querySelector('.main-content');
-        if (mainContent) {
-          mainContent.style.marginLeft = '0';
-          mainContent.style.padding = '16px';
-          mainContent.style.width = '100%';
+      if (currentUser) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        document.getElementById('user-name-display').textContent = currentUser.name;
+        document.getElementById('user-role-display').textContent = DB.Users.ROLES[currentUser.role] || currentUser.role;
+        document.getElementById('user-avatar').textContent = currentUser.name[0].toUpperCase();
+
+        if (standalone) {
+          document.body.classList.add('standalone-mode');
+          const sidebar = document.getElementById('sidebar');
+          const topbar = document.getElementById('topbar');
+          if (sidebar) sidebar.style.display = 'none';
+          if (topbar) topbar.style.display = 'none';
+          const mainContent = document.querySelector('.main-content');
+          if (mainContent) {
+            mainContent.style.marginLeft = '0';
+            mainContent.style.padding = '16px';
+            mainContent.style.width = '100%';
+          }
         }
+
+        const targetView = view || 'dashboard';
+        navigate(targetView);
+        updateNotifications();
+      } else {
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('app').classList.add('hidden');
       }
 
-      const targetView = view || 'dashboard';
-      navigate(targetView);
-      updateNotifications();
+      // Check auto backup daily at 19:00 (every 30 seconds)
+      setInterval(() => {
+        if (currentUser && DB.LocalBackup) {
+          DB.LocalBackup.checkAutoBackup();
+        }
+      }, 30000);
 
-      // Check auto download backup
-      DB.Backup.checkAutoDownloadBackup();
+      // Run immediately on load if logged in
+      if (currentUser && DB.LocalBackup) {
+        DB.LocalBackup.checkAutoBackup();
+      }
     });
   }
 
