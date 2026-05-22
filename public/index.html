@@ -84,7 +84,7 @@
       startBackupBtn.disabled = true;
 
       // Sostituisci il fetch verso il server locale con quello di Vercel
-      const response = await fetch('https://agave-five.vercel.app/api/backup', {
+      const response = await fetch(`${window.location.origin}/api/backup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // opzionalmente puoi inviare il nome della cartella scelta (solo per log)
