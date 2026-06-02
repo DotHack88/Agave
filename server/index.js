@@ -14,8 +14,8 @@ const PORT = 3000;   // Accedi con http://localhost:3000
 app.use(cors());
 app.use(bodyParser.json());
 
-// Serve i file statici della UI (public/)
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Serve i file statici dalla root del progetto
+app.use(express.static(path.join(__dirname, '..')));
 
 // ------------------- POST /backup -------------------
 // body: { destFolder: "nomeCartellaSceltaDallUtente" }

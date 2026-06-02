@@ -38,17 +38,6 @@ const Sections = (() => {
         <div class="ri-qty ${m.type}">${m.type==='in'?'+':'-'}${m.qty}</div>
       </div>`).join('')||'<div class="empty-state" style="padding:20px"><p>Nessun movimento</p></div>'}</div>
   </div>
-  <div class="card">
-    <div class="card-header"><span class="card-title">⚠️ Scorte basse</span><button class="btn btn-ghost btn-sm" onclick="App.navigate('products')">Tutti →</button></div>
-    ${low.length ? `<div class="table-wrap"><table><thead><tr><th>Prodotto</th><th>Disp.</th><th>Min.</th><th></th></tr></thead><tbody>
-    ${low.slice(0,6).map(p=>`<tr>
-      <td><div style="font-weight:600;font-size:.85rem">${App.escape(p.name)}</div><div class="td-code">${p.code}</div></td>
-      <td><span class="badge ${p.qty===0?'badge-red':'badge-yellow'}">${p.qty}</span></td>
-      <td><span class="badge badge-gray">${p.qtyMin}</span></td>
-      <td><button class="btn btn-success btn-sm" onclick="App.navigate('inbound');Sections.prefillInbound(${p.id})">+ Carica</button></td>
-    </tr>`).join('')}</tbody></table></div>` :
-    '<div class="empty-state" style="padding:30px"><div class="es-icon">✅</div><h3>Tutte le scorte OK</h3></div>'}
-  </div>
 </div>`;
   }
 
