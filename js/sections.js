@@ -38,6 +38,34 @@ const Sections = (() => {
         <div class="ri-qty ${m.type}">${m.type==='in'?'+':'-'}${m.qty}</div>
       </div>`).join('')||'<div class="empty-state" style="padding:20px"><p>Nessun movimento</p></div>'}</div>
   </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📦 Scorte ${low.length ? `<span class="badge badge-red" style="margin-left:8px">${low.length}</span>` : ''}</span>
+      <button class="btn btn-ghost btn-sm" onclick="App.navigate('products');Sections.toggleLowStockFilter()">Vedi tutti →</button>
+    </div>
+    <div class="recent-list">${low.length ? low.map(p => {
+      const stockPct = p.qtyMin > 0 ? Math.min(100, Math.round((p.qty / p.qtyMin) * 100)) : 100;
+      const stockClass = p.qty === 0 ? 'critical' : 'low';
+      const badge = p.qty === 0 ? 'badge-red' : 'badge-yellow';
+      return `
+      <div class="recent-item">
+        <div class="ri-dot" style="background:var(${p.qty === 0 ? '--red' : '--yellow'})"></div>
+        <div class="ri-info">
+          <div class="ri-name">${App.escape(p.name)}</div>
+          <div class="ri-meta">${p.code || '—'} • Min: ${p.qtyMin}</div>
+          <div class="stock-bar" style="margin-top:4px;max-width:120px">
+            <div class="stock-bar-track"><div class="stock-bar-fill ${stockClass}" style="width:${stockPct}%"></div></div>
+          </div>
+        </div>
+        <span class="badge ${badge}" style="margin-right:6px">${p.qty}</span>
+        <div class="td-actions">
+          <button class="btn btn-success btn-sm" onclick="App.navigate('inbound');Sections.prefillInbound(${p.id})" title="Carica">+</button>
+          <button class="btn btn-danger btn-sm" onclick="App.navigate('outbound');Sections.prefillOutbound(${p.id})" title="Scarica">-</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty-state" style="padding:20px"><div class="es-icon">✅</div><p>Tutti i prodotti sono sopra la scorta minima</p></div>'}</div>
+  </div>
 </div>`;
   }
 
@@ -91,7 +119,9 @@ const Sections = (() => {
   <div class="actions">
     ${canEdit?`<button class="btn btn-primary" onclick="Sections.openProductForm()">
       ➕ Nuovo Prodotto</button>`:''}
-    <button class="btn btn-ghost" onclick="Sections.exportProducts()">⬇ Esporta</button>
+          <button class="btn btn-ghost" onclick="Sections.exportProducts()">⬇ Esporta</button>
+     <button class="btn btn-ghost btn-sm" onclick="SectionsCSV.openImportModal()">📂 Importa CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="SectionsCSV.openImportModal()">📂 Importa CSV</button>
   </div>
 </div>
 <div class="filters-bar">
@@ -188,10 +218,18 @@ const Sections = (() => {
   }
 
   function productFormHTML(p = {}) {
+    const brands = DB.Products.brands();
+    const brandOptions = brands.map(b => `<option value="${App.escape(b)}"></option>`).join('');
     return `<div class="form-grid">
       <div class="form-group"><label>Barcode / EAN</label><input id="pf-barcode" value="${App.escape(p.barcode||'')}" placeholder="8001234567890"/></div>
       <div class="form-group span-2"><label>Nome Prodotto *</label><input id="pf-name" value="${App.escape(p.name||'')}" placeholder="Nome del prodotto"/></div>
-      <div class="form-group"><label>Marca</label><input id="pf-brand" value="${App.escape(p.brand||'')}" placeholder="Marca"/></div>
+      <div class="form-group">
+        <label>Marca</label>
+        <input id="pf-brand" value="${App.escape(p.brand||'')}" placeholder="Marca" list="brand-suggestions" autocomplete="off"/>
+        <datalist id="brand-suggestions">
+          ${brandOptions}
+        </datalist>
+      </div>
       <div class="form-group"><label>Modello</label><input id="pf-model" value="${App.escape(p.model||'')}" placeholder="Modello"/></div>
       <div class="form-group"><label>Quantità disponibile</label><input id="pf-qty" type="number" min="0" value="${p.qty||0}"/></div>
       <div class="form-group"><label>Quantità minima (scorta)</label><input id="pf-qtyMin" type="number" min="0" value="${p.qtyMin||0}"/></div>

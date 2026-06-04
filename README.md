@@ -23,13 +23,17 @@ Software gestionale moderno, performante e reattivo per la gestione del magazzin
 - `js/sections2.js`: Sezione Carico (Inbound), Scarico (Outbound) e Movimenti.
 - `js/sections3.js`: Sezione Import CSV, Analytics (Report) e Impostazioni.
 
-## Utilizzo Locale
+# Avvio Locale
 
-Per avviare l'applicazione in locale, eseguire:
 ```bash
-python -m http.server 8080
+# Install server dependencies
+npm install
+
+# Avvia il server Express (ascolta su http://localhost:3000)
+node server/index.js
 ```
-Quindi aprire il browser all'indirizzo: `http://localhost:8080`
+
+Poi apri il browser all'indirizzo `http://localhost:3000`.
 
 **Credenziali demo**:
 - **Admin**: `admin` / `admin`

@@ -261,7 +261,15 @@ Object.assign(Sections, {
     await DB.LocalBackup.executeBackup(false);
   },
 
-  _saveSetting(key, val) { DB.Settings.set({[key]:val}); App.toast('Impostazione salvata','success'); },
+  _saveSetting(key, val) {
+    DB.Settings.set({[key]:val});
+    if (key === 'lowStockAlert') {
+      App.toast(val ? 'Notifiche scorte basse abilitate' : 'Notifiche scorte basse disabilitate', 'success');
+      App.updateNotifications();
+    } else {
+      App.toast('Impostazione salvata', 'success');
+    }
+  },
 
   _restoreAutoBackup() {
     App.confirm('Ripristinare l\'ultimo backup automatico? I dati attuali verranno sovrascritti.', () => {

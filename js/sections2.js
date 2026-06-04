@@ -131,7 +131,7 @@ Object.assign(Sections, {
       <label><b>Cerca o Scansiona Prodotto</b></label>
       <input type="text" id="ib-search-input" placeholder="Scansiona barcode o digita nome, marca, modello..." 
         oninput="Sections.searchInboundProd(this.value)" onkeydown="if(event.key==='Enter'){Sections.handleInboundBarcode(this.value);this.value='';document.getElementById('ib-search-results').classList.add('hidden');}" autocomplete="off" class="form-control" style="width:100%"/>
-      <div id="ib-search-results" class="search-results hidden" style="position:absolute; width:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm)"></div>
+      <div id="ib-search-results" class="local-autocomplete hidden"></div>
     </div>
 
     <div class="table-wrap" style="margin-top:16px; margin-bottom:16px">
@@ -273,7 +273,7 @@ Object.assign(Sections, {
       <label><b>Cerca o Scansiona Prodotto</b></label>
       <input type="text" id="ob-search-input" placeholder="Scansiona barcode o digita nome, marca, modello..." 
         oninput="Sections.searchOutboundProd(this.value)" onkeydown="if(event.key==='Enter'){Sections.handleOutboundBarcode(this.value);this.value='';document.getElementById('ob-search-results').classList.add('hidden');}" autocomplete="off" class="form-control" style="width:100%"/>
-      <div id="ob-search-results" class="search-results hidden" style="position:absolute; width:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm)"></div>
+      <div id="ob-search-results" class="local-autocomplete hidden"></div>
     </div>
 
     <div class="table-wrap" style="margin-top:16px; margin-bottom:16px">
@@ -420,13 +420,14 @@ Object.assign(Sections, {
     // Apply sorting to movements list
     if (filt.sortKey) {
       moves.sort((a, b) => {
-        let valA = a[filt.sortKey] || '';
-        let valB = b[filt.sortKey] || '';
-        if (filt.sortKey === 'brand') {
-          valA = (a.brand || '').toLowerCase();
-          valB = (b.brand || '').toLowerCase();
-        }
+        let valA = a[filt.sortKey];
+        let valB = b[filt.sortKey];
+        if (valA === undefined || valA === null) valA = '';
+        if (valB === undefined || valB === null) valB = '';
+        
         if (typeof valA === 'string') {
+          valA = valA.toLowerCase();
+          valB = String(valB).toLowerCase();
           return filt.sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         } else {
           return filt.sortOrder === 'asc' ? valA - valB : valB - valA;
@@ -439,38 +440,69 @@ Object.assign(Sections, {
       return filt.sortOrder === 'asc' ? '▲' : '▼';
     };
 
-    el.innerHTML = `
+    const hasStructure = el.querySelector('.filters-bar') !== null;
+    if (!hasStructure) {
+      el.innerHTML = `
 <div class="page-header"><h1>Movimenti Magazzino</h1>
   <div class="actions">
     <button class="btn btn-ghost" onclick="Sections._exportMovements()">⬇ Esporta CSV</button>
   </div>
 </div>
 <div class="filters-bar">
-  <select onchange="window._movFilt.type=this.value;Sections.renderMovements()">
-    <option value="" ${!filt.type?'selected':''}>Tutti i tipi</option>
-    <option value="in" ${filt.type==='in'?'selected':''}>📥 Entrate</option>
-    <option value="out" ${filt.type==='out'?'selected':''}>📤 Uscite</option>
+  <select id="mov-filter-type" onchange="window._movFilt.type=this.value;Sections.renderMovements()">
+    <option value="">Tutti i tipi</option>
+    <option value="in">📥 Entrate</option>
+    <option value="out">📤 Uscite</option>
   </select>
-  <input type="text" placeholder="🔍 Filtra per prodotto, codice, brand..." value="${filt.q}"
+  <input type="text" id="mov-filter-q" placeholder="🔍 Filtra per prodotto, codice, brand..." value="${filt.q}"
     oninput="window._movFilt.q=this.value;Sections.renderMovements()" style="flex:1"/>
   <label style="font-size:.82rem;color:var(--text2)">Dal</label>
-  <input type="date" value="${filt.from}" onchange="window._movFilt.from=this.value;Sections.renderMovements()"/>
+  <input type="date" id="mov-filter-from" value="${filt.from}" onchange="window._movFilt.from=this.value;Sections.renderMovements()"/>
   <label style="font-size:.82rem;color:var(--text2)">Al</label>
-  <input type="date" value="${filt.to}" onchange="window._movFilt.to=this.value;Sections.renderMovements()"/>
-  <button class="btn btn-ghost btn-sm" onclick="window._movFilt={type:'',q:'',from:'',to:'',sortKey:'date',sortOrder:'desc'};Sections.renderMovements()">Reset</button>
+  <input type="date" id="mov-filter-to" value="${filt.to}" onchange="window._movFilt.to=this.value;Sections.renderMovements()"/>
+  <button class="btn btn-ghost btn-sm" onclick="Sections.resetMovFilters()">Reset</button>
 </div>
 <div class="table-wrap"><table>
 <thead><tr>
-  <th>Tipo</th>
+  <th style="cursor:pointer" onclick="Sections.toggleMovSort('type')">Tipo ${arrow('type')}</th>
   <th style="cursor:pointer" onclick="Sections.toggleMovSort('date')">Data ${arrow('date')}</th>
-  <th>Prodotto</th>
-  <th>Codice</th>
+  <th style="cursor:pointer" onclick="Sections.toggleMovSort('productName')">Prodotto ${arrow('productName')}</th>
+  <th style="cursor:pointer" onclick="Sections.toggleMovSort('productCode')">Codice ${arrow('productCode')}</th>
   <th style="cursor:pointer" onclick="Sections.toggleMovSort('brand')">Marca ${arrow('brand')}</th>
-  <th>Modello</th>
-  <th>Qty</th>
-  <th>Operatore</th>
+  <th style="cursor:pointer" onclick="Sections.toggleMovSort('model')">Modello ${arrow('model')}</th>
+  <th style="cursor:pointer" onclick="Sections.toggleMovSort('qty')">Qty ${arrow('qty')}</th>
+  <th style="cursor:pointer" onclick="Sections.toggleMovSort('operator')">Operatore ${arrow('operator')}</th>
 </tr></thead>
-<tbody>${moves.length ? moves.map(m=>`<tr>
+<tbody id="movements-tbody"></tbody>
+</table></div>`;
+    } else {
+      // Keep filter input values synced with state if updated programmatically
+      const inputQ = document.getElementById('mov-filter-q');
+      if (inputQ && inputQ.value !== filt.q) inputQ.value = filt.q;
+      const selectType = document.getElementById('mov-filter-type');
+      if (selectType && selectType.value !== filt.type) selectType.value = filt.type;
+      const inputFrom = document.getElementById('mov-filter-from');
+      if (inputFrom && inputFrom.value !== filt.from) inputFrom.value = filt.from;
+      const inputTo = document.getElementById('mov-filter-to');
+      if (inputTo && inputTo.value !== filt.to) inputTo.value = filt.to;
+
+      // Update header arrows in-place
+      const headers = el.querySelectorAll('thead th');
+      if (headers.length >= 8) {
+        headers[0].innerHTML = `Tipo ${arrow('type')}`;
+        headers[1].innerHTML = `Data ${arrow('date')}`;
+        headers[2].innerHTML = `Prodotto ${arrow('productName')}`;
+        headers[3].innerHTML = `Codice ${arrow('productCode')}`;
+        headers[4].innerHTML = `Marca ${arrow('brand')}`;
+        headers[5].innerHTML = `Modello ${arrow('model')}`;
+        headers[6].innerHTML = `Qty ${arrow('qty')}`;
+        headers[7].innerHTML = `Operatore ${arrow('operator')}`;
+      }
+    }
+
+    const tbody = document.getElementById('movements-tbody');
+    if (tbody) {
+      tbody.innerHTML = moves.length ? moves.map(m=>`<tr>
   <td><span class="badge ${m.type==='in'?'badge-green':'badge-red'}">${m.type==='in'?'📥 Entrata':'📤 Uscita'}</span></td>
   <td style="font-size:.82rem;white-space:nowrap">${App.fmtDate(m.date)}</td>
   <td style="font-weight:600;font-size:.87rem">${App.escape(m.productName)}</td>
@@ -479,8 +511,8 @@ Object.assign(Sections, {
   <td>${App.escape(m.model || '—')}</td>
   <td><span class="badge ${m.type==='in'?'badge-green':'badge-red'}">${m.type==='in'?'+':'-'}${m.qty}</span></td>
   <td style="font-size:.8rem">${App.escape(m.operator || '')}</td>
-</tr>`).join('') : '<tr><td colspan="8"><div class="empty-state" style="padding:30px"><div class="es-icon">📋</div><h3>Nessun movimento trovato</h3></div></td></tr>'}
-</tbody></table></div>`;
+</tr>`).join('') : '<tr><td colspan="8"><div class="empty-state" style="padding:30px"><div class="es-icon">📋</div><h3>Nessun movimento trovato</h3></div></td></tr>';
+    }
   },
 
   toggleMovSort(key) {
@@ -492,6 +524,13 @@ Object.assign(Sections, {
       filt.sortOrder = 'asc';
     }
     window._movFilt = filt;
+    this.renderMovements();
+  },
+
+  resetMovFilters() {
+    window._movFilt = { type:'', q:'', from:'', to:'', sortKey:'date', sortOrder:'desc' };
+    const el = document.getElementById('section-movements');
+    if (el) el.innerHTML = '';
     this.renderMovements();
   },
 

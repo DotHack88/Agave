@@ -109,13 +109,20 @@ const App = (() => {
 
   // ── NOTIFICATIONS ──
   function updateNotifications() {
+    const s = DB.Settings.get();
+    const bell = document.getElementById('notif-bell');
+    if (bell) {
+      bell.style.display = s.lowStockAlert ? '' : 'none';
+    }
     const low = DB.Products.lowStock();
     const out = DB.Products.outOfStock();
     const total = low.length + out.length;
     const badge = document.getElementById('notif-count');
-    badge.textContent = total;
-    badge.setAttribute('data-count', total);
-    badge.style.display = total > 0 ? 'flex' : 'none';
+    if (badge) {
+      badge.textContent = total;
+      badge.setAttribute('data-count', total);
+      badge.style.display = (total > 0 && s.lowStockAlert) ? 'flex' : 'none';
+    }
   }
 
   function toggleNotifications() {
@@ -325,8 +332,30 @@ const App = (() => {
     }
   });
   document.addEventListener('click', e => {
-    if (!e.target.closest('#notif-bell')) document.getElementById('notif-panel').classList.add('hidden');
-    if (!e.target.closest('.search-bar') && !e.target.closest('#search-results')) document.getElementById('search-results').classList.add('hidden');
+    if (!e.target.closest('#notif-bell')) {
+      const notifPanel = document.getElementById('notif-panel');
+      if (notifPanel) notifPanel.classList.add('hidden');
+    }
+    if (!e.target.closest('.search-bar') && !e.target.closest('#search-results')) {
+      const searchResults = document.getElementById('search-results');
+      if (searchResults) searchResults.classList.add('hidden');
+    }
+    // Close local autocomplete panels in inbound and outbound sections
+    if (!e.target.closest('#ib-search-input') && !e.target.closest('#ib-search-results')) {
+      const ibResults = document.getElementById('ib-search-results');
+      if (ibResults) ibResults.classList.add('hidden');
+    }
+    if (!e.target.closest('#ob-search-input') && !e.target.closest('#ob-search-results')) {
+      const obResults = document.getElementById('ob-search-results');
+      if (obResults) obResults.classList.add('hidden');
+    }
+    // Close sidebar on mobile when clicking outside of it
+    if (window.innerWidth <= 768) {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && sidebar.classList.contains('open') && !e.target.closest('#sidebar') && !e.target.closest('.mobile-menu-btn')) {
+        sidebar.classList.remove('open');
+      }
+    }
   });
 
   // Enter key on login
