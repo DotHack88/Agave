@@ -414,14 +414,19 @@ Object.assign(Sections, {
   // Salviamo il focus dell'input prima di aggiornare il DOM
   renderMovements() {
     const el = document.getElementById('section-movements');
-    const filt = window._movFilt || { type:'', q:'', from:'', to:'', sortKey:'date', sortOrder:'desc' };
+    const filt = window._movFilt || { type:'', q:'', from:'', to:'', brand:'', sortKey:'date', sortOrder:'desc' };
     window._movFilt = filt;
 
     // Ricordiamo quale input era attivo e la posizione del cursore
     const activeId = document.activeElement ? document.activeElement.id : null;
     const activeSel = document.activeElement ? { start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
 
-    const moves = DB.Movements.filter(filt);
+    let moves = DB.Movements.filter(filt);
+
+    // Apply brand filter on top of DB.Movements.filter
+    if (filt.brand) {
+      moves = moves.filter(m => (m.brand || '').toLowerCase() === filt.brand.toLowerCase());
+    }
 
     // Apply sorting to movements list
     if (filt.sortKey) {
@@ -445,6 +450,9 @@ Object.assign(Sections, {
       return filt.sortOrder === 'asc' ? '▲' : '▼';
     };
 
+    // Collect unique brands from ALL movements for the filter dropdown
+    const allBrands = [...new Set(DB.Movements.all().map(m => m.brand).filter(Boolean))].sort();
+
     const hasStructure = el.querySelector('.filters-bar') !== null;
     if (!hasStructure) {
       // Prima costruzione: crea l'intera struttura HTML
@@ -459,6 +467,10 @@ Object.assign(Sections, {
     <option value="">Tutti i tipi</option>
     <option value="in"${filt.type==='in'?' selected':''}>📥 Entrate</option>
     <option value="out"${filt.type==='out'?' selected':''}>📤 Uscite</option>
+  </select>
+  <select id="mov-filter-brand" onchange="window._movFilt.brand=this.value;Sections.renderMovements()">
+    <option value="">Tutte le marche</option>
+    ${allBrands.map(b => `<option value="${App.escape(b)}"${filt.brand===b?' selected':''}>${App.escape(b)}</option>`).join('')}
   </select>
   <input type="text" id="mov-filter-q" placeholder="🔍 Filtra per prodotto, codice, brand..." value="${filt.q}"
     oninput="window._movFilt.q=this.value;Sections.renderMovements()" style="flex:1"/>
@@ -486,6 +498,19 @@ Object.assign(Sections, {
       // Aggiorniamo solo i valori se diversi dallo stato (evitando il reset del focus)
       const selectType = document.getElementById('mov-filter-type');
       if (selectType && selectType.value !== filt.type) selectType.value = filt.type;
+
+      // Update brand dropdown options dynamically
+      const selectBrand = document.getElementById('mov-filter-brand');
+      if (selectBrand) {
+        const currentOptions = selectBrand.options.length - 1; // minus "Tutte le marche"
+        if (currentOptions !== allBrands.length) {
+          selectBrand.innerHTML = `<option value="">Tutte le marche</option>` +
+            allBrands.map(b => `<option value="${App.escape(b)}"${filt.brand===b?' selected':''}>${App.escape(b)}</option>`).join('');
+        } else if (selectBrand.value !== filt.brand) {
+          selectBrand.value = filt.brand;
+        }
+      }
+
       const inputFrom = document.getElementById('mov-filter-from');
       if (inputFrom && inputFrom.value !== filt.from) inputFrom.value = filt.from;
       const inputTo = document.getElementById('mov-filter-to');
@@ -532,7 +557,7 @@ Object.assign(Sections, {
   },
 
   toggleMovSort(key) {
-    const filt = window._movFilt || { type:'', q:'', from:'', to:'', sortKey:'date', sortOrder:'desc' };
+    const filt = window._movFilt || { type:'', q:'', from:'', to:'', brand:'', sortKey:'date', sortOrder:'desc' };
     if (filt.sortKey === key) {
       filt.sortOrder = filt.sortOrder === 'asc' ? 'desc' : 'asc';
     } else {
@@ -544,7 +569,7 @@ Object.assign(Sections, {
   },
 
   resetMovFilters() {
-    window._movFilt = { type:'', q:'', from:'', to:'', sortKey:'date', sortOrder:'desc' };
+    window._movFilt = { type:'', q:'', from:'', to:'', brand:'', sortKey:'date', sortOrder:'desc' };
     const el = document.getElementById('section-movements');
     if (el) el.innerHTML = ''; // Rebuild layout completo
     this.renderMovements();

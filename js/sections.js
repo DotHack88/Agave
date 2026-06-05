@@ -129,6 +129,7 @@ const Sections = (() => {
 <div class="page-header">
   <h1>Prodotti <span id="prod-count-badge" style="color:var(--text2);font-size:1rem;font-weight:400">(${prods.length})</span></h1>
   <div class="actions">
+    ${canDel?`<button id="btn-delete-selected" class="btn btn-danger hidden" onclick="Sections.deleteSelectedProducts()">🗑️ Elimina Selezionati</button>`:''}
     ${canEdit?`<button class="btn btn-primary" onclick="Sections.openProductForm()">
       ➕ Nuovo Prodotto</button>`:''}
           <button class="btn btn-ghost" onclick="Sections.exportProducts()">⬇ Esporta</button>
@@ -145,6 +146,7 @@ const Sections = (() => {
 <table id="products-table">
 <thead>
   <tr>
+    <th style="width:40px;text-align:center"><input type="checkbox" id="prod-select-all" onclick="Sections.toggleAllProducts(this)"></th>
     <th style="cursor:pointer" onclick="Sections.toggleProdSort('code')">Codice ${getSortArrow('code')}</th>
     <th style="cursor:pointer" onclick="Sections.toggleProdSort('name')">Prodotto ${getSortArrow('name')}</th>
     <th style="cursor:pointer" onclick="Sections.toggleProdSort('brand')">Marca ${getSortArrow('brand')}</th>
@@ -159,13 +161,13 @@ const Sections = (() => {
 </div>`;
     } else {
       const headers = el.querySelectorAll('thead th');
-      if (headers.length >= 6) {
-        headers[0].innerHTML = `Codice ${getSortArrow('code')}`;
-        headers[1].innerHTML = `Prodotto ${getSortArrow('name')}`;
-        headers[2].innerHTML = `Marca ${getSortArrow('brand')}`;
-        headers[3].innerHTML = `Modello ${getSortArrow('model')}`;
-        headers[4].innerHTML = `Giacenza ${getSortArrow('qty')}`;
-        headers[5].innerHTML = `Scorta min. ${getSortArrow('qtyMin')}`;
+      if (headers.length >= 7) {
+        headers[1].innerHTML = `Codice ${getSortArrow('code')}`;
+        headers[2].innerHTML = `Prodotto ${getSortArrow('name')}`;
+        headers[3].innerHTML = `Marca ${getSortArrow('brand')}`;
+        headers[4].innerHTML = `Modello ${getSortArrow('model')}`;
+        headers[5].innerHTML = `Giacenza ${getSortArrow('qty')}`;
+        headers[6].innerHTML = `Scorta min. ${getSortArrow('qtyMin')}`;
       }
     }
 
@@ -179,6 +181,7 @@ const Sections = (() => {
         const stockClass = p.qty === 0 ? 'critical' : p.qty <= p.qtyMin ? 'low' : 'ok';
         const badge = p.qty === 0 ? 'badge-red' : p.qty <= p.qtyMin ? 'badge-yellow' : 'badge-green';
         return `<tr>
+          <td style="text-align:center"><input type="checkbox" class="prod-checkbox" value="${p.id}" onclick="Sections.updateDeleteSelectedButton()"></td>
           <td><div class="td-code">${p.code}</div>${p.barcode?`<div class="td-code" style="font-size:.7rem;color:var(--text3)">${p.barcode}</div>`:''}</td>
           <td style="font-weight:600;max-width:240px">${App.escape(p.name)}</td>
           <td>${App.escape(p.brand||'—')}</td>
@@ -196,7 +199,7 @@ const Sections = (() => {
             <button class="btn btn-danger" onclick="App.navigate('outbound');Sections.prefillOutbound(${p.id})">-</button>
           </div></td>
         </tr>`;
-      }).join('') : '<tr><td colspan="7"><div class="empty-state"><div class="es-icon">📦</div><h3>Nessun prodotto trovato</h3><p>Prova a modificare i filtri o aggiungine uno nuovo</p></div></td></tr>';
+      }).join('') : '<tr><td colspan="8"><div class="empty-state"><div class="es-icon">📦</div><h3>Nessun prodotto trovato</h3><p>Prova a modificare i filtri o aggiungine uno nuovo</p></div></td></tr>';
     }
   }
 
@@ -291,8 +294,45 @@ const Sections = (() => {
   function saveProduct(id) {
     const data = getProductFormData();
     if (!data.name) { App.toast('Il nome prodotto è obbligatorio','error'); return; }
-    if (id) { DB.Products.update(id, data); App.toast('Prodotto aggiornato','success'); }
-    else { DB.Products.create(data); App.toast('Prodotto creato','success'); }
+    if (id) {
+      // Editing existing product – check if qty changed to register movement
+      const oldProd = DB.Products.find(id);
+      const oldQty = oldProd ? (oldProd.qty || 0) : 0;
+      DB.Products.update(id, data);
+      const delta = (data.qty || 0) - oldQty;
+      if (delta !== 0) {
+        const updatedProd = DB.Products.find(id);
+        DB.Movements.create({
+          type: delta > 0 ? 'in' : 'out',
+          productId: updatedProd.id,
+          productCode: updatedProd.code,
+          productName: updatedProd.name,
+          qty: Math.abs(delta),
+          brand: updatedProd.brand || '',
+          model: updatedProd.model || '',
+          operator: App.getUser()?.name || 'admin',
+          notes: delta > 0 ? 'Carico da modifica prodotto' : 'Scarico da modifica prodotto'
+        });
+      }
+      App.toast('Prodotto aggiornato','success');
+    } else {
+      const created = DB.Products.create(data);
+      // Automatically register inbound movement for initial stock
+      if (created && (created.qty || 0) > 0) {
+        DB.Movements.create({
+          type: 'in',
+          productId: created.id,
+          productCode: created.code,
+          productName: created.name,
+          qty: created.qty,
+          brand: created.brand || '',
+          model: created.model || '',
+          operator: App.getUser()?.name || 'admin',
+          notes: 'Carico iniziale da creazione prodotto'
+        });
+      }
+      App.toast('Prodotto creato','success');
+    }
     App.closeModal(); App.updateNotifications();
     const el = document.getElementById('section-products');
     if (el) el.innerHTML = ''; // Rebuild layout
@@ -317,6 +357,46 @@ const Sections = (() => {
     });
   }
 
+  function toggleAllProducts(source) {
+    const checkboxes = document.querySelectorAll('.prod-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateDeleteSelectedButton();
+  }
+
+  function updateDeleteSelectedButton() {
+    const btn = document.getElementById('btn-delete-selected');
+    const checked = document.querySelectorAll('.prod-checkbox:checked');
+    if (btn) {
+      if (checked.length > 0) {
+        btn.classList.remove('hidden');
+        btn.textContent = `🗑️ Elimina Selezionati (${checked.length})`;
+      } else {
+        btn.classList.add('hidden');
+      }
+    }
+    const selectAll = document.getElementById('prod-select-all');
+    if (selectAll) {
+      const allBoxes = document.querySelectorAll('.prod-checkbox');
+      selectAll.checked = allBoxes.length > 0 && checked.length === allBoxes.length;
+    }
+  }
+
+  function deleteSelectedProducts() {
+    const checked = document.querySelectorAll('.prod-checkbox:checked');
+    if (checked.length === 0) return;
+    
+    App.confirm(`Eliminare definitivamente ${checked.length} prodotti selezionati? L'operazione non è reversibile.`, () => {
+      checked.forEach(cb => {
+        DB.Products.delete(parseInt(cb.value, 10));
+      });
+      App.toast(`${checked.length} prodotti eliminati`, 'warning');
+      App.updateNotifications();
+      const el = document.getElementById('section-products');
+      if (el) el.innerHTML = '';
+      renderProducts();
+    });
+  }
+
   function exportProducts() {
     const prods = DB.Products.filter(prodFilters);
     const headers = ['barcode','nome','marca','modello','quantita','quantita_minima','descrizione'];
@@ -330,7 +410,7 @@ const Sections = (() => {
 
   return { render, renderDashboard, renderProducts, setProdFilter, resetProdFilters,
     openProductForm, editProduct, saveProduct, duplicateProduct, deleteProduct, exportProducts,
-    toggleProdSort, getSortArrow,
+    toggleProdSort, getSortArrow, toggleAllProducts, updateDeleteSelectedButton, deleteSelectedProducts,
     prefillInbound: () => {}, prefillOutbound: () => {},
     renderInbound:()=>{}, renderOutbound:()=>{}, renderMovements:()=>{},
     renderCSV:()=>{}, renderReports:()=>{}, renderSettings:()=>{} };

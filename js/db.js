@@ -153,7 +153,20 @@ const DB = (() => {
 
   // ── MOVEMENTS ──
   const Movements = {
-    all() { return load(KEYS.movements) || []; },
+    all() { 
+      const arr = load(KEYS.movements) || []; 
+      const prods = load(KEYS.products) || [];
+      arr.forEach(m => {
+        if (!m.brand || !m.model) {
+          const p = prods.find(pr => pr.id === m.productId);
+          if (p) {
+            if (!m.brand) m.brand = p.brand || '';
+            if (!m.model) m.model = p.model || '';
+          }
+        }
+      });
+      return arr;
+    },
     find(id) { return this.all().find(m => m.id === id); },
     create(data) {
       const id = nextId('MOV');
@@ -166,7 +179,7 @@ const DB = (() => {
       if (opts.productId) arr = arr.filter(m=>m.productId===opts.productId);
       if (opts.from) arr = arr.filter(m=>m.date>=opts.from);
       if (opts.to) arr = arr.filter(m=>m.date<=opts.to);
-      if (opts.q) { const s=opts.q.toLowerCase(); arr=arr.filter(m=>m.productName?.toLowerCase().includes(s)||m.document?.toLowerCase().includes(s)||m.customer?.toLowerCase().includes(s)||m.supplier?.toLowerCase().includes(s)); }
+      if (opts.q) { const s=opts.q.toLowerCase(); arr=arr.filter(m=>m.productName?.toLowerCase().includes(s)||m.productCode?.toLowerCase().includes(s)||m.brand?.toLowerCase().includes(s)||m.model?.toLowerCase().includes(s)||m.document?.toLowerCase().includes(s)||m.customer?.toLowerCase().includes(s)||m.supplier?.toLowerCase().includes(s)); }
       return arr;
     },
     byProduct() {
@@ -239,10 +252,10 @@ const DB = (() => {
     },
     FIELD_MAP: {
       'codice':'code','cod':'code','product_code':'code',
-      'barcode':'barcode','ean':'barcode','cod_barre':'barcode',
-      'nome':'name','name':'name','prodotto':'name','product':'name',
+      'barcode':'barcode','ean':'barcode','cod_barre':'barcode','codice a barre':'barcode',
+      'nome':'name','name':'name','prodotto':'name','product':'name','nome prodotto':'name',
       'categoria':'category','category':'category','cat':'category',
-      'marca':'brand','brand':'brand','marchio':'brand',
+      'marca':'brand','brand':'brand','marchio':'brand','marca prodotto':'brand',
       'modello':'model','model':'model',
       'quantita':'qty','quantity':'qty','qta':'qty','qty':'qty',
       'quantita_minima':'qtyMin','qty_min':'qtyMin','scorta_min':'qtyMin',
@@ -277,16 +290,62 @@ const DB = (() => {
         const row = this.mapRow(rawRow);
         const errors = this.validate(row);
         if (errors.length) { results.errors.push({ row:idx+2, errors }); return; }
-        const numRow = {
-          ...row,
-          qty: row.qty ? Number(row.qty) : 0,
-          qtyMin: row.qtyMin ? Number(row.qtyMin) : 0,
-          priceBuy: row.priceBuy ? Number(row.priceBuy) : 0,
-          priceSell: row.priceSell ? Number(row.priceSell) : 0
-        };
+        
         const existing = row.code ? Products.findByCode(row.code) : null;
-        if (existing) { Products.update(existing.id, numRow); results.updated++; }
-        else { Products.create(numRow); results.created++; }
+        
+        // Prepare row data, preserving existing numbers if missing in CSV
+        const numRow = { ...row };
+        if (row.qty !== undefined && row.qty !== '') numRow.qty = Number(row.qty);
+        else if (existing) numRow.qty = existing.qty || 0;
+        else numRow.qty = 0;
+
+        if (row.qtyMin !== undefined && row.qtyMin !== '') numRow.qtyMin = Number(row.qtyMin);
+        else if (existing) numRow.qtyMin = existing.qtyMin || 0;
+        else numRow.qtyMin = 0;
+
+        if (row.priceBuy !== undefined && row.priceBuy !== '') numRow.priceBuy = Number(row.priceBuy);
+        else if (existing) numRow.priceBuy = existing.priceBuy || 0;
+        else numRow.priceBuy = 0;
+
+        if (row.priceSell !== undefined && row.priceSell !== '') numRow.priceSell = Number(row.priceSell);
+        else if (existing) numRow.priceSell = existing.priceSell || 0;
+        else numRow.priceSell = 0;
+
+        if (existing) {
+          const oldQty = existing.qty || 0;
+          Products.update(existing.id, numRow);
+          const delta = (numRow.qty || 0) - oldQty;
+          if (delta !== 0) {
+            Movements.create({
+              type: delta > 0 ? 'in' : 'out',
+              productId: existing.id,
+              productCode: existing.code,
+              productName: numRow.name || existing.name,
+              qty: Math.abs(delta),
+              brand: numRow.brand || existing.brand || '',
+              model: numRow.model || existing.model || '',
+              operator: operatorName || 'admin',
+              notes: delta > 0 ? 'Carico da importazione CSV' : 'Scarico da importazione CSV'
+            });
+          }
+          results.updated++;
+        } else {
+          const created = Products.create(numRow);
+          if (created && (created.qty || 0) > 0) {
+            Movements.create({
+              type: 'in',
+              productId: created.id,
+              productCode: created.code,
+              productName: created.name,
+              qty: created.qty,
+              brand: created.brand || '',
+              model: created.model || '',
+              operator: operatorName || 'admin',
+              notes: 'Carico iniziale da importazione CSV'
+            });
+          }
+          results.created++;
+        }
       });
       return results;
     },

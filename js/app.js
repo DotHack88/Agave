@@ -166,10 +166,21 @@ const App = (() => {
   }
 
   // ── CONFIRM DIALOG ──
+  let confirmCallback = null;
+
   function confirm(msg, onYes) {
+    confirmCallback = onYes;
     openModal('Conferma', `<p style="color:var(--text2)">${msg}</p>`,
       `<button class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>
-       <button class="btn btn-danger" onclick="App.closeModal();(${onYes.toString()})()">Conferma</button>`);
+       <button class="btn btn-danger" onclick="App.executeConfirm()">Conferma</button>`);
+  }
+
+  function executeConfirm() {
+    closeModal();
+    if (confirmCallback) {
+      confirmCallback();
+      confirmCallback = null;
+    }
   }
 
   // ── FORMAT HELPERS ──
@@ -359,5 +370,5 @@ const App = (() => {
   initBarcodeScanner();
   initSession();
 
-  return { login, logout, getUser, navigate, toggleTheme, toggleSidebar, globalSearch, toast, openModal, closeModal, confirm, updateNotifications, toggleNotifications, fmt, fmtDate, fmtDateTime, escape, handleBarcodeScanned };
+  return { login, logout, getUser, navigate, toggleTheme, toggleSidebar, globalSearch, toast, openModal, closeModal, confirm, executeConfirm, updateNotifications, toggleNotifications, fmt, fmtDate, fmtDateTime, escape, handleBarcodeScanned };
 })();
