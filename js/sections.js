@@ -3,6 +3,16 @@
    Part 1: Dashboard & Products
    ============================ */
 const Sections = (() => {
+  /* ── CARD STYLING & ANIMATIONS ── */
+  const styles = `
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); transition: transform 0.15s ease, box-shadow 0.15s ease; overflow: hidden; }
+    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    .sidebar-overlay { opacity: 0; transition: opacity 0.2s ease; }
+    .sidebar-overlay.active { opacity: 1; }
+    .btn:hover { background-color: var(--primary-light); color: var(--text); }
+  `;
+  document.head.insertAdjacentHTML('beforeend', `<style>${styles}</style>`);
+
   // ── RENDER ROUTER ──
   function render(section) {
     const map = { dashboard:'renderDashboard', products:'renderProducts', inbound:'renderInbound',
@@ -17,6 +27,7 @@ const Sections = (() => {
     const prods = DB.Products.active();
     const low = DB.Products.lowStock();
     const moves = DB.Movements.all().slice(0,8);
+    const settings = DB.Settings.get();
 
     el.innerHTML = `
 <div class="page-header"><h1>Dashboard</h1>
@@ -39,6 +50,7 @@ const Sections = (() => {
       </div>`).join('')||'<div class="empty-state" style="padding:20px"><p>Nessun movimento</p></div>'}</div>
   </div>
 
+  ${settings.lowStockAlert ? `
   <div class="card">
     <div class="card-header">
       <span class="card-title">📦 Scorte ${low.length ? `<span class="badge badge-red" style="margin-left:8px">${low.length}</span>` : ''}</span>
@@ -65,7 +77,7 @@ const Sections = (() => {
         </div>
       </div>`;
     }).join('') : '<div class="empty-state" style="padding:20px"><div class="es-icon">✅</div><p>Tutti i prodotti sono sopra la scorta minima</p></div>'}</div>
-  </div>
+  </div>` : ''}
 </div>`;
   }
 
@@ -121,7 +133,6 @@ const Sections = (() => {
       ➕ Nuovo Prodotto</button>`:''}
           <button class="btn btn-ghost" onclick="Sections.exportProducts()">⬇ Esporta</button>
      <button class="btn btn-ghost btn-sm" onclick="SectionsCSV.openImportModal()">📂 Importa CSV</button>
-      <button class="btn btn-ghost btn-sm" onclick="SectionsCSV.openImportModal()">📂 Importa CSV</button>
   </div>
 </div>
 <div class="filters-bar">
@@ -147,7 +158,6 @@ const Sections = (() => {
 </table>
 </div>`;
     } else {
-      // Update headers in-place to keep sorting arrow correct without input focus loss
       const headers = el.querySelectorAll('thead th');
       if (headers.length >= 6) {
         headers[0].innerHTML = `Codice ${getSortArrow('code')}`;
@@ -217,6 +227,21 @@ const Sections = (() => {
     renderProducts();
   }
 
+  // ── BRAND AUTOCOMPLETE ──
+  // This function updates the <datalist> for the brand input field as the user types.
+  // It performs a case‑insensitive prefix match against all existing brand names.
+  // If no matches are found, it falls back to showing the full list.
+  function updateBrandSuggestions(query) {
+    const datalist = document.getElementById('brand-suggestions');
+    if (!datalist) return;
+    const allBrands = DB.Products.brands();
+    const filtered = allBrands.filter(b => b.toLowerCase().startsWith(query.toLowerCase()));
+    const options = (filtered.length ? filtered : allBrands)
+      .map(b => `<option value="${App.escape(b)}"></option>`)
+      .join('');
+    datalist.innerHTML = options;
+  }
+
   function productFormHTML(p = {}) {
     const brands = DB.Products.brands();
     const brandOptions = brands.map(b => `<option value="${App.escape(b)}"></option>`).join('');
@@ -225,7 +250,7 @@ const Sections = (() => {
       <div class="form-group span-2"><label>Nome Prodotto *</label><input id="pf-name" value="${App.escape(p.name||'')}" placeholder="Nome del prodotto"/></div>
       <div class="form-group">
         <label>Marca</label>
-        <input id="pf-brand" value="${App.escape(p.brand||'')}" placeholder="Marca" list="brand-suggestions" autocomplete="off"/>
+        <input id="pf-brand" value="${App.escape(p.brand||'')}" placeholder="Marca" list="brand-suggestions" autocomplete="off" oninput="Sections.updateBrandSuggestions(this.value)"/>
         <datalist id="brand-suggestions">
           ${brandOptions}
         </datalist>

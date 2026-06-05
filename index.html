@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agave WMS – Gestionale Magazzino</title>
+  <title>Agave – Gestionale Magazzino</title>
   <meta name="description" content="Software gestionale magazzino professionale: carico, scarico, giacenze, movimenti, report e importazione CSV." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -17,7 +17,7 @@
   <div class="login-card">
     <div class="login-logo">
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="14" fill="url(#lg1)"/><path d="M24 12C24 12 16 18 16 26C16 30.418 19.582 34 24 34C28.418 34 32 30.418 32 26C32 18 24 12 24 12Z" stroke="#fff" stroke-width="2.5" fill="rgba(255,255,255,0.2)"/><path d="M24 34V20M24 28L19 23M24 24L28 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><defs><linearGradient id="lg1" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10b981"/><stop offset="1" stop-color="#047857"/></linearGradient></defs></svg>
-      <span>Agave WMS</span>
+      <span>Agave</span>
     </div>
     <h1>Accedi al Gestionale</h1>
     <p class="login-sub">Inserisci le tue credenziali per continuare</p>
@@ -43,7 +43,7 @@
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <svg width="32" height="32" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="14" fill="url(#lg2)"/><path d="M24 12C24 12 16 18 16 26C16 30.418 19.582 34 24 34C28.418 34 32 30.418 32 26C32 18 24 12 24 12Z" stroke="#fff" stroke-width="2.5" fill="rgba(255,255,255,0.2)"/><path d="M24 34V20M24 28L19 23M24 24L28 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><defs><linearGradient id="lg2" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10b981"/><stop offset="1" stop-color="#047857"/></linearGradient></defs></svg>
-        <span>Agave WMS</span>
+        <span>Agave</span>
       </div>
       <button id="sidebar-toggle" class="sidebar-toggle" onclick="App.toggleSidebar()">&#9776;</button>
     </div>
@@ -102,15 +102,15 @@
         <button class="mobile-menu-btn" onclick="App.toggleSidebar()">&#9776;</button>
         <h2 id="page-title">Dashboard</h2>
       </div>
-      <div class="topbar-right">
+      <div class="topbar-center">
         <div class="search-bar">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="global-search" placeholder="Cerca prodotto..." oninput="App.globalSearch(this.value)" />
         </div>
-        <div class="notifications" id="notif-bell" onclick="App.toggleNotifications()">
-          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="notif-badge" id="notif-count">0</span>
-        </div>
+        <!-- SEARCH RESULTS -->
+        <div id="search-results" class="search-results hidden"></div>
+      </div>
+      <div class="topbar-right">
         <button class="theme-toggle" onclick="App.toggleTheme()" title="Cambia tema">
           <svg id="theme-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
@@ -120,8 +120,8 @@
     <!-- NOTIFICATIONS PANEL -->
     <div id="notif-panel" class="notif-panel hidden"></div>
 
-    <!-- SEARCH RESULTS -->
-    <div id="search-results" class="search-results hidden"></div>
+    <!-- MOBILE SIDEBAR OVERLAY -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="App.toggleSidebar()"></div>
 
     <!-- SECTIONS -->
     <div id="section-dashboard" class="section active"></div>

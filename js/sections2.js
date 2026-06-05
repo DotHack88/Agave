@@ -411,10 +411,16 @@ Object.assign(Sections, {
   },
 
   // ── MOVEMENTS VIEW WITH SORTING ──
+  // Salviamo il focus dell'input prima di aggiornare il DOM
   renderMovements() {
     const el = document.getElementById('section-movements');
     const filt = window._movFilt || { type:'', q:'', from:'', to:'', sortKey:'date', sortOrder:'desc' };
     window._movFilt = filt;
+
+    // Ricordiamo quale input era attivo e la posizione del cursore
+    const activeId = document.activeElement ? document.activeElement.id : null;
+    const activeSel = document.activeElement ? { start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
+
     const moves = DB.Movements.filter(filt);
 
     // Apply sorting to movements list
@@ -424,7 +430,6 @@ Object.assign(Sections, {
         let valB = b[filt.sortKey];
         if (valA === undefined || valA === null) valA = '';
         if (valB === undefined || valB === null) valB = '';
-        
         if (typeof valA === 'string') {
           valA = valA.toLowerCase();
           valB = String(valB).toLowerCase();
@@ -442,6 +447,7 @@ Object.assign(Sections, {
 
     const hasStructure = el.querySelector('.filters-bar') !== null;
     if (!hasStructure) {
+      // Prima costruzione: crea l'intera struttura HTML
       el.innerHTML = `
 <div class="page-header"><h1>Movimenti Magazzino</h1>
   <div class="actions">
@@ -451,8 +457,8 @@ Object.assign(Sections, {
 <div class="filters-bar">
   <select id="mov-filter-type" onchange="window._movFilt.type=this.value;Sections.renderMovements()">
     <option value="">Tutti i tipi</option>
-    <option value="in">📥 Entrate</option>
-    <option value="out">📤 Uscite</option>
+    <option value="in"${filt.type==='in'?' selected':''}>📥 Entrate</option>
+    <option value="out"${filt.type==='out'?' selected':''}>📤 Uscite</option>
   </select>
   <input type="text" id="mov-filter-q" placeholder="🔍 Filtra per prodotto, codice, brand..." value="${filt.q}"
     oninput="window._movFilt.q=this.value;Sections.renderMovements()" style="flex:1"/>
@@ -463,7 +469,7 @@ Object.assign(Sections, {
   <button class="btn btn-ghost btn-sm" onclick="Sections.resetMovFilters()">Reset</button>
 </div>
 <div class="table-wrap"><table>
-<thead><tr>
+<thead id="mov-thead"><tr>
   <th style="cursor:pointer" onclick="Sections.toggleMovSort('type')">Tipo ${arrow('type')}</th>
   <th style="cursor:pointer" onclick="Sections.toggleMovSort('date')">Data ${arrow('date')}</th>
   <th style="cursor:pointer" onclick="Sections.toggleMovSort('productName')">Prodotto ${arrow('productName')}</th>
@@ -476,17 +482,17 @@ Object.assign(Sections, {
 <tbody id="movements-tbody"></tbody>
 </table></div>`;
     } else {
-      // Keep filter input values synced with state if updated programmatically
-      const inputQ = document.getElementById('mov-filter-q');
-      if (inputQ && inputQ.value !== filt.q) inputQ.value = filt.q;
+      // Aggiornamenti successivi: NON ricostruiamo il DOM dell'input
+      // Aggiorniamo solo i valori se diversi dallo stato (evitando il reset del focus)
       const selectType = document.getElementById('mov-filter-type');
       if (selectType && selectType.value !== filt.type) selectType.value = filt.type;
       const inputFrom = document.getElementById('mov-filter-from');
       if (inputFrom && inputFrom.value !== filt.from) inputFrom.value = filt.from;
       const inputTo = document.getElementById('mov-filter-to');
       if (inputTo && inputTo.value !== filt.to) inputTo.value = filt.to;
+      // NON tocchiamo mov-filter-q: l'utente lo sta modificando, il valore è già aggiornato
 
-      // Update header arrows in-place
+      // Aggiorniamo solo le frecce di ordinamento nelle intestazioni
       const headers = el.querySelectorAll('thead th');
       if (headers.length >= 8) {
         headers[0].innerHTML = `Tipo ${arrow('type')}`;
@@ -500,6 +506,7 @@ Object.assign(Sections, {
       }
     }
 
+    // Aggiorniamo solo il corpo della tabella
     const tbody = document.getElementById('movements-tbody');
     if (tbody) {
       tbody.innerHTML = moves.length ? moves.map(m=>`<tr>
@@ -512,6 +519,15 @@ Object.assign(Sections, {
   <td><span class="badge ${m.type==='in'?'badge-green':'badge-red'}">${m.type==='in'?'+':'-'}${m.qty}</span></td>
   <td style="font-size:.8rem">${App.escape(m.operator || '')}</td>
 </tr>`).join('') : '<tr><td colspan="8"><div class="empty-state" style="padding:30px"><div class="es-icon">📋</div><h3>Nessun movimento trovato</h3></div></td></tr>';
+    }
+
+    // Ripristiniamo il focus sull'input che era attivo prima dell'aggiornamento
+    if (activeId) {
+      const el2 = document.getElementById(activeId);
+      if (el2 && document.activeElement !== el2) {
+        el2.focus();
+        try { el2.setSelectionRange(activeSel.start, activeSel.end); } catch(e) {}
+      }
     }
   },
 
@@ -530,7 +546,7 @@ Object.assign(Sections, {
   resetMovFilters() {
     window._movFilt = { type:'', q:'', from:'', to:'', sortKey:'date', sortOrder:'desc' };
     const el = document.getElementById('section-movements');
-    if (el) el.innerHTML = '';
+    if (el) el.innerHTML = ''; // Rebuild layout completo
     this.renderMovements();
   },
 

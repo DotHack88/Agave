@@ -243,6 +243,7 @@ const DB = (() => {
       'nome':'name','name':'name','prodotto':'name','product':'name',
       'categoria':'category','category':'category','cat':'category',
       'marca':'brand','brand':'brand','marchio':'brand',
+      'modello':'model','model':'model',
       'quantita':'qty','quantity':'qty','qta':'qty','qty':'qty',
       'quantita_minima':'qtyMin','qty_min':'qtyMin','scorta_min':'qtyMin',
       'prezzo_acquisto':'priceBuy','buy_price':'priceBuy','costo':'priceBuy',
@@ -261,7 +262,10 @@ const DB = (() => {
     },
     validate(row) {
       const errors = [];
+      if (!row.barcode) errors.push('Barcode mancante');
       if (!row.name) errors.push('Nome prodotto mancante');
+      if (!row.brand) errors.push('Marca prodotto mancante');
+      if (!row.model) errors.push('Modello prodotto mancante');
       if (row.qty !== undefined && isNaN(Number(row.qty))) errors.push('Quantità non valida');
       if (row.priceBuy !== undefined && isNaN(Number(row.priceBuy))) errors.push('Prezzo acquisto non valido');
       if (row.priceSell !== undefined && isNaN(Number(row.priceSell))) errors.push('Prezzo vendita non valido');

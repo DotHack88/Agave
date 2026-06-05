@@ -54,8 +54,10 @@ const App = (() => {
   function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     const mc = document.querySelector('.main-content');
+    const overlay = document.getElementById('sidebar-overlay');
     if (window.innerWidth <= 768) {
-      sb.classList.toggle('open');
+      const isOpen = sb.classList.toggle('open');
+      if (overlay) overlay.classList.toggle('active', isOpen);
     } else {
       sidebarOpen = !sidebarOpen;
       sb.classList.toggle('collapsed', !sidebarOpen);
@@ -81,8 +83,12 @@ const App = (() => {
     document.getElementById('page-title').textContent = titles[section] || section;
     document.getElementById('search-results').classList.add('hidden');
     document.getElementById('global-search').value = '';
-    // Close mobile sidebar
-    if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+    // Close mobile sidebar + overlay
+    if (window.innerWidth <= 768) {
+      document.getElementById('sidebar').classList.remove('open');
+      const overlay = document.getElementById('sidebar-overlay');
+      if (overlay) overlay.classList.remove('active');
+    }
     // Render section
     Sections.render(section);
   }
@@ -109,20 +115,9 @@ const App = (() => {
 
   // ── NOTIFICATIONS ──
   function updateNotifications() {
-    const s = DB.Settings.get();
+    // Campanella rimossa dall'interfaccia – funzione mantenuta per compatibilità
     const bell = document.getElementById('notif-bell');
-    if (bell) {
-      bell.style.display = s.lowStockAlert ? '' : 'none';
-    }
-    const low = DB.Products.lowStock();
-    const out = DB.Products.outOfStock();
-    const total = low.length + out.length;
-    const badge = document.getElementById('notif-count');
-    if (badge) {
-      badge.textContent = total;
-      badge.setAttribute('data-count', total);
-      badge.style.display = (total > 0 && s.lowStockAlert) ? 'flex' : 'none';
-    }
+    if (bell) bell.style.display = 'none';
   }
 
   function toggleNotifications() {
@@ -332,10 +327,6 @@ const App = (() => {
     }
   });
   document.addEventListener('click', e => {
-    if (!e.target.closest('#notif-bell')) {
-      const notifPanel = document.getElementById('notif-panel');
-      if (notifPanel) notifPanel.classList.add('hidden');
-    }
     if (!e.target.closest('.search-bar') && !e.target.closest('#search-results')) {
       const searchResults = document.getElementById('search-results');
       if (searchResults) searchResults.classList.add('hidden');
@@ -352,8 +343,10 @@ const App = (() => {
     // Close sidebar on mobile when clicking outside of it
     if (window.innerWidth <= 768) {
       const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
       if (sidebar && sidebar.classList.contains('open') && !e.target.closest('#sidebar') && !e.target.closest('.mobile-menu-btn')) {
         sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
       }
     }
   });
