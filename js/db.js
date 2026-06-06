@@ -4,7 +4,7 @@
    ============================ */
 const DB = (() => {
   const PREFIX = 'agavewms_';
-  const KEYS = { products:'products', movements:'movements', users:'users', settings:'settings', counters:'counters' };
+  const KEYS = { products: 'products', movements: 'movements', users: 'users', settings: 'settings', counters: 'counters' };
 
   // ── Helpers ──
   function load(key) {
@@ -20,44 +20,44 @@ const DB = (() => {
     return c[entity];
   }
   function genCode(prefix) {
-    return prefix + String(nextId(prefix)).padStart(5,'0');
+    return prefix + String(nextId(prefix)).padStart(5, '0');
   }
   function now() { return new Date().toISOString(); }
-  function today() { return new Date().toISOString().slice(0,10); }
+  function today() { return new Date().toISOString().slice(0, 10); }
 
   // ── INIT ──
   function init() {
     // Default users
     if (!load(KEYS.users)) {
       save(KEYS.users, [
-        { id:1, username:'admin', password:'admin', name:'Amministratore', role:'admin', active:true, created:now() },
-        { id:2, username:'magazziniere', password:'1234', name:'Mario Rossi', role:'warehouse', active:true, created:now() },
-        { id:3, username:'operatore', password:'1234', name:'Luca Bianchi', role:'operator', active:true, created:now() },
-        { id:4, username:'Daniele', password:'Citerio', name:'Daniele Citerio', role:'admin', active:true, created:now() }
+        { id: 1, username: 'admin', password: 'admin', name: 'Amministratore', role: 'admin', active: true, created: now() },
+        { id: 2, username: 'magazziniere', password: '1234', name: 'Mario Rossi', role: 'warehouse', active: true, created: now() },
+        { id: 3, username: 'operatore', password: '1234', name: 'Luca Bianchi', role: 'operator', active: true, created: now() },
+        { id: 4, username: 'Daniele', password: 'Citerio', name: 'Daniele Citerio', role: 'admin', active: true, created: now() }
       ]);
     }
     // Default settings
     if (!load(KEYS.settings)) {
       save(KEYS.settings, {
-        company:'La Mia Azienda', currency:'EUR', currencySymbol:'€',
-        lowStockAlert:true, backupAuto:false, theme:'dark', language:'it',
-        csvDelimiter:',', defaultCategory:'Generale'
+        company: 'La Mia Azienda', currency: 'EUR', currencySymbol: '€',
+        lowStockAlert: true, backupAuto: false, theme: 'dark', language: 'it',
+        csvDelimiter: ',', defaultCategory: 'Generale'
       });
     }
     // Demo products
     if (!load(KEYS.products)) {
       const demo = [
-        { id:1001, code:'PRD01001', barcode:'8001234567890', name:'Laptop Pro 15"', category:'Informatica', brand:'TechBrand', description:'Laptop professionale 15 pollici', qty:42, qtyMin:10, priceBuy:650, priceSell:999, supplier:'TechSupply Srl', location:'A-01-01', active:true, created:now(), notes:'', image:'' },
-        { id:1002, code:'PRD01002', barcode:'8009876543210', name:'Mouse Wireless', category:'Informatica', brand:'LogiMouse', description:'Mouse senza fili ergonomico', qty:7, qtyMin:15, priceBuy:12, priceSell:29, supplier:'TechSupply Srl', location:'A-01-02', active:true, created:now(), notes:'', image:'' },
-        { id:1003, code:'PRD01003', barcode:'8005555555555', name:'Tastiera Meccanica', category:'Informatica', brand:'KeyMaster', description:'Tastiera meccanica RGB', qty:23, qtyMin:5, priceBuy:45, priceSell:89, supplier:'ComputerParts Srl', location:'A-02-01', active:true, created:now(), notes:'', image:'' },
-        { id:1004, code:'PRD01004', barcode:'8007777777777', name:'Monitor 27" 4K', category:'Informatica', brand:'ViewMax', description:'Monitor UHD 4K HDR', qty:3, qtyMin:5, priceBuy:280, priceSell:499, supplier:'TechSupply Srl', location:'B-01-01', active:true, created:now(), notes:'', image:'' },
-        { id:1005, code:'PRD01005', barcode:'8002222222222', name:'Cuffie Bluetooth', category:'Audio', brand:'SoundPro', description:'Cuffie wireless con ANC', qty:18, qtyMin:8, priceBuy:55, priceSell:129, supplier:'AudioStore Srl', location:'C-01-01', active:true, created:now(), notes:'', image:'' },
-        { id:1006, code:'PRD01006', barcode:'8003333333333', name:'Webcam Full HD', category:'Informatica', brand:'CamPro', description:'Webcam 1080p con microfono', qty:0, qtyMin:5, priceBuy:28, priceSell:59, supplier:'TechSupply Srl', location:'A-02-02', active:true, created:now(), notes:'Esaurito!', image:'' },
-        { id:1007, code:'PRD01007', barcode:'8004444444444', name:'Hub USB-C 7 Porte', category:'Accessori', brand:'HubMax', description:'Hub USB-C con HDMI e lettore SD', qty:31, qtyMin:10, priceBuy:22, priceSell:49, supplier:'ComputerParts Srl', location:'A-03-01', active:true, created:now(), notes:'', image:'' },
-        { id:1008, code:'PRD01008', barcode:'8006666666666', name:'SSD Esterno 1TB', category:'Storage', brand:'SpeedDisk', description:'SSD portatile USB-C 1TB', qty:12, qtyMin:6, priceBuy:75, priceSell:149, supplier:'StoragePro Srl', location:'B-02-01', active:true, created:now(), notes:'', image:'' }
+        { id: 1001, code: 'PRD01001', barcode: '8001234567890', name: 'Laptop Pro 15"', category: 'Informatica', brand: 'TechBrand', description: 'Laptop professionale 15 pollici', qty: 42, qtyMin: 10, priceBuy: 650, priceSell: 999, supplier: 'TechSupply Srl', location: 'A-01-01', active: true, created: now(), notes: '', image: '' },
+        { id: 1002, code: 'PRD01002', barcode: '8009876543210', name: 'Mouse Wireless', category: 'Informatica', brand: 'LogiMouse', description: 'Mouse senza fili ergonomico', qty: 7, qtyMin: 15, priceBuy: 12, priceSell: 29, supplier: 'TechSupply Srl', location: 'A-01-02', active: true, created: now(), notes: '', image: '' },
+        { id: 1003, code: 'PRD01003', barcode: '8005555555555', name: 'Tastiera Meccanica', category: 'Informatica', brand: 'KeyMaster', description: 'Tastiera meccanica RGB', qty: 23, qtyMin: 5, priceBuy: 45, priceSell: 89, supplier: 'ComputerParts Srl', location: 'A-02-01', active: true, created: now(), notes: '', image: '' },
+        { id: 1004, code: 'PRD01004', barcode: '8007777777777', name: 'Monitor 27" 4K', category: 'Informatica', brand: 'ViewMax', description: 'Monitor UHD 4K HDR', qty: 3, qtyMin: 5, priceBuy: 280, priceSell: 499, supplier: 'TechSupply Srl', location: 'B-01-01', active: true, created: now(), notes: '', image: '' },
+        { id: 1005, code: 'PRD01005', barcode: '8002222222222', name: 'Cuffie Bluetooth', category: 'Audio', brand: 'SoundPro', description: 'Cuffie wireless con ANC', qty: 18, qtyMin: 8, priceBuy: 55, priceSell: 129, supplier: 'AudioStore Srl', location: 'C-01-01', active: true, created: now(), notes: '', image: '' },
+        { id: 1006, code: 'PRD01006', barcode: '8003333333333', name: 'Webcam Full HD', category: 'Informatica', brand: 'CamPro', description: 'Webcam 1080p con microfono', qty: 0, qtyMin: 5, priceBuy: 28, priceSell: 59, supplier: 'TechSupply Srl', location: 'A-02-02', active: true, created: now(), notes: 'Esaurito!', image: '' },
+        { id: 1007, code: 'PRD01007', barcode: '8004444444444', name: 'Hub USB-C 7 Porte', category: 'Accessori', brand: 'HubMax', description: 'Hub USB-C con HDMI e lettore SD', qty: 31, qtyMin: 10, priceBuy: 22, priceSell: 49, supplier: 'ComputerParts Srl', location: 'A-03-01', active: true, created: now(), notes: '', image: '' },
+        { id: 1008, code: 'PRD01008', barcode: '8006666666666', name: 'SSD Esterno 1TB', category: 'Storage', brand: 'SpeedDisk', description: 'SSD portatile USB-C 1TB', qty: 12, qtyMin: 6, priceBuy: 75, priceSell: 149, supplier: 'StoragePro Srl', location: 'B-02-01', active: true, created: now(), notes: '', image: '' }
       ];
       save(KEYS.products, demo);
-      save(KEYS.counters, { PRD:1008, MOV:2000, USR:10 });
+      save(KEYS.counters, { PRD: 1008, MOV: 2000, USR: 10 });
       // Demo movements
       const moves = [];
       const now2 = new Date();
@@ -67,10 +67,10 @@ const DB = (() => {
         const pid = demo[i % demo.length];
         moves.push({
           id: 2001 + i, type, productId: pid.id, productCode: pid.code,
-          productName: pid.name, qty: Math.floor(Math.random()*10)+1,
-          priceBuy: pid.priceBuy, supplier: type==='in' ? pid.supplier : '',
-          customer: type==='out' ? 'Cliente Demo' : '', document: 'DOC-' + (1000+i),
-          operator: 'admin', date: d.toISOString().slice(0,10), ts: d.toISOString(), notes:''
+          productName: pid.name, qty: Math.floor(Math.random() * 10) + 1,
+          priceBuy: pid.priceBuy, supplier: type === 'in' ? pid.supplier : '',
+          customer: type === 'out' ? 'Cliente Demo' : '', document: 'DOC-' + (1000 + i),
+          operator: 'admin', date: d.toISOString().slice(0, 10), ts: d.toISOString(), notes: ''
         });
       }
       save(KEYS.movements, moves);
@@ -86,24 +86,25 @@ const DB = (() => {
     search(q) {
       const s = q.toLowerCase();
       return this.active().filter(p =>
-        (p.name || '').toLowerCase().includes(s) || 
+        (p.name || '').toLowerCase().includes(s) ||
         (p.code || '').toLowerCase().includes(s) ||
-        (p.barcode || '').includes(s) || 
+        (p.barcode || '').includes(s) ||
         (p.category || '').toLowerCase().includes(s) ||
-        (p.brand || '').toLowerCase().includes(s) || 
-        (p.model || '').toLowerCase().includes(s) || 
+        (p.brand || '').toLowerCase().includes(s) ||
+        (p.model || '').toLowerCase().includes(s) ||
         (p.supplier || '').toLowerCase().includes(s)
       );
     },
     create(data) {
       const id = nextId('PRD');
-      const p = { id, code: data.code || genCode('PRD'), active:true, created:now(), qty:0, ...data };
+      const protocol = nextId('PROT'); // Sequential protocol number
+      const p = { id, protocol, code: data.code || genCode('PRD'), active: true, created: now(), qty: 0, ...data };
       const all = this.all(); all.push(p); save(KEYS.products, all); return p;
     },
     update(id, data) {
       const all = this.all();
       const i = all.findIndex(p => p.id === id);
-      if (i<0) return null;
+      if (i < 0) return null;
       all[i] = { ...all[i], ...data, id };
       save(KEYS.products, all); return all[i];
     },
@@ -111,10 +112,21 @@ const DB = (() => {
       const all = this.all().filter(p => p.id !== id);
       save(KEYS.products, all);
     },
-    deactivate(id) { return this.update(id, { active:false }); },
+    deactivate(id) { return this.update(id, { active: false }); },
     duplicate(id) {
       const p = this.find(id); if (!p) return null;
-      return this.create({ ...p, id:undefined, code:undefined, barcode:'', qty:0, created:undefined });
+      // Create a new product copy with a new ID, internal code, and protocol
+      return this.create({
+        ...p,
+        id: undefined,
+        // Generate an internal code with prefix 'INT'
+        code: genCode('INT'),
+        barcode: '',
+        qty: 0,
+        qtyMin: 0,
+        created: undefined,
+        protocol: undefined // will be set in create()
+      });
     },
     updateQty(id, delta) {
       const p = this.find(id); if (!p) return;
@@ -126,8 +138,8 @@ const DB = (() => {
     categories() { return [...new Set(this.active().map(p => p.category).filter(Boolean))].sort(); },
     brands() { return [...new Set(this.active().map(p => p.brand).filter(Boolean))].sort(); },
     suppliers() { return [...new Set(this.active().map(p => p.supplier).filter(Boolean))].sort(); },
-    totalValue() { return this.active().reduce((s,p) => s + (p.qty * p.priceBuy), 0); },
-    totalQty() { return this.active().reduce((s,p) => s + (p.qty || 0), 0); },
+    totalValue() { return this.active().reduce((s, p) => s + (p.qty * p.priceBuy), 0); },
+    totalQty() { return this.active().reduce((s, p) => s + (p.qty || 0), 0); },
     filter(opts = {}) {
       let arr = this.active();
       if (opts.q) {
@@ -142,19 +154,19 @@ const DB = (() => {
           (p.supplier || '').toLowerCase().includes(s)
         );
       }
-      if (opts.category) arr = arr.filter(p=>p.category===opts.category);
-      if (opts.brand) arr = arr.filter(p=>p.brand===opts.brand);
-      if (opts.supplier) arr = arr.filter(p=>p.supplier===opts.supplier);
-      if (opts.lowStock) arr = arr.filter(p=>p.qty<=p.qtyMin);
-      if (opts.outOfStock) arr = arr.filter(p=>p.qty===0);
+      if (opts.category) arr = arr.filter(p => p.category === opts.category);
+      if (opts.brand) arr = arr.filter(p => p.brand === opts.brand);
+      if (opts.supplier) arr = arr.filter(p => p.supplier === opts.supplier);
+      if (opts.lowStock) arr = arr.filter(p => p.qty <= p.qtyMin);
+      if (opts.outOfStock) arr = arr.filter(p => p.qty === 0);
       return arr;
     }
   };
 
   // ── MOVEMENTS ──
   const Movements = {
-    all() { 
-      const arr = load(KEYS.movements) || []; 
+    all() {
+      const arr = load(KEYS.movements) || [];
       const prods = load(KEYS.products) || [];
       arr.forEach(m => {
         if (!m.brand || !m.model) {
@@ -175,31 +187,31 @@ const DB = (() => {
     },
     filter(opts = {}) {
       let arr = this.all();
-      if (opts.type) arr = arr.filter(m=>m.type===opts.type);
-      if (opts.productId) arr = arr.filter(m=>m.productId===opts.productId);
-      if (opts.from) arr = arr.filter(m=>m.date>=opts.from);
-      if (opts.to) arr = arr.filter(m=>m.date<=opts.to);
-      if (opts.q) { const s=opts.q.toLowerCase(); arr=arr.filter(m=>m.productName?.toLowerCase().includes(s)||m.productCode?.toLowerCase().includes(s)||m.brand?.toLowerCase().includes(s)||m.model?.toLowerCase().includes(s)||m.document?.toLowerCase().includes(s)||m.customer?.toLowerCase().includes(s)||m.supplier?.toLowerCase().includes(s)); }
+      if (opts.type) arr = arr.filter(m => m.type === opts.type);
+      if (opts.productId) arr = arr.filter(m => m.productId === opts.productId);
+      if (opts.from) arr = arr.filter(m => m.date >= opts.from);
+      if (opts.to) arr = arr.filter(m => m.date <= opts.to);
+      if (opts.q) { const s = opts.q.toLowerCase(); arr = arr.filter(m => m.productName?.toLowerCase().includes(s) || m.productCode?.toLowerCase().includes(s) || m.brand?.toLowerCase().includes(s) || m.model?.toLowerCase().includes(s) || m.document?.toLowerCase().includes(s) || m.customer?.toLowerCase().includes(s) || m.supplier?.toLowerCase().includes(s)); }
       return arr;
     },
     byProduct() {
       const map = {};
       this.all().forEach(m => {
-        if (!map[m.productId]) map[m.productId] = { in:0, out:0, name:m.productName, id:m.productId };
+        if (!map[m.productId]) map[m.productId] = { in: 0, out: 0, name: m.productName, id: m.productId };
         map[m.productId][m.type] += m.qty;
       });
-      return Object.values(map).sort((a,b)=>(b.in+b.out)-(a.in+a.out));
+      return Object.values(map).sort((a, b) => (b.in + b.out) - (a.in + a.out));
     },
-    monthlyStats(months=6) {
+    monthlyStats(months = 6) {
       const result = [];
       const now2 = new Date();
-      for (let i=months-1; i>=0; i--) {
-        const d = new Date(now2.getFullYear(), now2.getMonth()-i, 1);
-        const key = d.toISOString().slice(0,7);
-        const label = d.toLocaleDateString('it-IT',{month:'short',year:'2-digit'});
-        const ins = this.all().filter(m=>m.type==='in'&&m.date?.startsWith(key)).reduce((s,m)=>s+m.qty,0);
-        const outs = this.all().filter(m=>m.type==='out'&&m.date?.startsWith(key)).reduce((s,m)=>s+m.qty,0);
-        result.push({ label, in:ins, out:outs });
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(now2.getFullYear(), now2.getMonth() - i, 1);
+        const key = d.toISOString().slice(0, 7);
+        const label = d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
+        const ins = this.all().filter(m => m.type === 'in' && m.date?.startsWith(key)).reduce((s, m) => s + m.qty, 0);
+        const outs = this.all().filter(m => m.type === 'out' && m.date?.startsWith(key)).reduce((s, m) => s + m.qty, 0);
+        result.push({ label, in: ins, out: outs });
       }
       return result;
     }
@@ -208,22 +220,22 @@ const DB = (() => {
   // ── USERS ──
   const Users = {
     all() { return load(KEYS.users) || []; },
-    find(id) { return this.all().find(u=>String(u.id)===String(id)); },
-    authenticate(username, password) { return this.all().find(u=>u.username===username&&u.password===password&&u.active); },
+    find(id) { return this.all().find(u => String(u.id) === String(id)); },
+    authenticate(username, password) { return this.all().find(u => u.username === username && u.password === password && u.active); },
     create(data) {
       const id = nextId('USR');
-      const u = { id, active:true, created:now(), ...data };
+      const u = { id, active: true, created: now(), ...data };
       const all = this.all(); all.push(u); save(KEYS.users, all); return u;
     },
     update(id, data) {
       const all = this.all();
-      const i = all.findIndex(u=>String(u.id)===String(id));
-      if (i<0) return null;
-      all[i] = {...all[i],...data,id:all[i].id};
+      const i = all.findIndex(u => String(u.id) === String(id));
+      if (i < 0) return null;
+      all[i] = { ...all[i], ...data, id: all[i].id };
       save(KEYS.users, all); return all[i];
     },
-    delete(id) { save(KEYS.users, this.all().filter(u=>String(u.id)!==String(id))); },
-    ROLES: { admin:'Amministratore', warehouse:'Magazziniere', operator:'Operatore', viewer:'Visualizzatore' },
+    delete(id) { save(KEYS.users, this.all().filter(u => String(u.id) !== String(id))); },
+    ROLES: { admin: 'Amministratore', warehouse: 'Magazziniere', operator: 'Operatore', viewer: 'Visualizzatore' },
     canEdit(user) { return true; },
     canDelete(user) { return true; },
     canImport(user) { return true; },
@@ -238,36 +250,36 @@ const DB = (() => {
 
   // ── CSV IMPORT ──
   const CSV = {
-    parse(text, delimiter=',') {
+    parse(text, delimiter = ',') {
       const lines = text.trim().split('\n');
-      if (!lines.length) return { headers:[], rows:[] };
-      const headers = lines[0].split(delimiter).map(h=>h.trim().replace(/"/g,'').toLowerCase());
+      if (!lines.length) return { headers: [], rows: [] };
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/"/g, '').toLowerCase());
       const rows = lines.slice(1).map(line => {
-        const vals = line.split(delimiter).map(v=>v.trim().replace(/"/g,''));
+        const vals = line.split(delimiter).map(v => v.trim().replace(/"/g, ''));
         const obj = {};
-        headers.forEach((h,i)=>{ obj[h]=vals[i]||''; });
+        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
         return obj;
-      }).filter(r=>Object.values(r).some(v=>v));
+      }).filter(r => Object.values(r).some(v => v));
       return { headers, rows };
     },
     FIELD_MAP: {
-      'codice':'code','cod':'code','product_code':'code',
-      'barcode':'barcode','ean':'barcode','cod_barre':'barcode','codice a barre':'barcode',
-      'nome':'name','name':'name','prodotto':'name','product':'name','nome prodotto':'name',
-      'categoria':'category','category':'category','cat':'category',
-      'marca':'brand','brand':'brand','marchio':'brand','marca prodotto':'brand',
-      'modello':'model','model':'model',
-      'quantita':'qty','quantity':'qty','qta':'qty','qty':'qty',
-      'quantita_minima':'qtyMin','qty_min':'qtyMin','scorta_min':'qtyMin',
-      'prezzo_acquisto':'priceBuy','buy_price':'priceBuy','costo':'priceBuy',
-      'prezzo_vendita':'priceSell','sell_price':'priceSell','prezzo':'priceSell',
-      'fornitore':'supplier','supplier':'supplier',
-      'ubicazione':'location','location':'location','posizione':'location',
-      'descrizione':'description','description':'description','note':'notes','notes':'notes'
+      'codice': 'code', 'cod': 'code', 'product_code': 'code',
+      'barcode': 'barcode', 'ean': 'barcode', 'cod_barre': 'barcode', 'codice a barre': 'barcode',
+      'nome': 'name', 'name': 'name', 'prodotto': 'name', 'product': 'name', 'nome prodotto': 'name',
+      'categoria': 'category', 'category': 'category', 'cat': 'category',
+      'marca': 'brand', 'brand': 'brand', 'marchio': 'brand', 'marca prodotto': 'brand',
+      'modello': 'model', 'model': 'model',
+      'quantita': 'qty', 'quantity': 'qty', 'qta': 'qty', 'qty': 'qty', 'disponibilita': 'qty', 'disponibilita\'': 'qty', 'Disponibilita': 'qty',
+      'quantita_minima': 'qtyMin', 'qty_min': 'qtyMin', 'scorta_min': 'qtyMin',
+      'prezzo_acquisto': 'priceBuy', 'buy_price': 'priceBuy', 'costo': 'priceBuy',
+      'prezzo_vendita': 'priceSell', 'sell_price': 'priceSell', 'prezzo': 'priceSell',
+      'fornitore': 'supplier', 'supplier': 'supplier',
+      'ubicazione': 'location', 'location': 'location', 'posizione': 'location',
+      'descrizione': 'description', 'description': 'description', 'note': 'notes', 'notes': 'notes'
     },
     mapRow(rawRow) {
       const mapped = {};
-      Object.entries(rawRow).forEach(([k,v]) => {
+      Object.entries(rawRow).forEach(([k, v]) => {
         const field = this.FIELD_MAP[k.toLowerCase()];
         if (field) mapped[field] = v;
       });
@@ -279,35 +291,48 @@ const DB = (() => {
       if (!row.name) errors.push('Nome prodotto mancante');
       if (!row.brand) errors.push('Marca prodotto mancante');
       if (!row.model) errors.push('Modello prodotto mancante');
-      if (row.qty !== undefined && isNaN(Number(row.qty))) errors.push('Quantità non valida');
-      if (row.priceBuy !== undefined && isNaN(Number(row.priceBuy))) errors.push('Prezzo acquisto non valido');
-      if (row.priceSell !== undefined && isNaN(Number(row.priceSell))) errors.push('Prezzo vendita non valido');
+      // Le quantità errate (es. "ND", "La Saponaria") verranno automaticamente 
+      // convertite in 0 durante l'import, per non bloccare l'intero file.
       return errors;
     },
     import(rows, operatorName) {
-      const results = { created:0, updated:0, errors:[] };
+      const results = { created: 0, updated: 0, errors: [] };
       rows.forEach((rawRow, idx) => {
         const row = this.mapRow(rawRow);
         const errors = this.validate(row);
-        if (errors.length) { results.errors.push({ row:idx+2, errors }); return; }
-        
+        if (errors.length) { results.errors.push({ row: idx + 2, errors }); return; }
+
         const existing = row.code ? Products.findByCode(row.code) : null;
-        
+
         // Prepare row data, preserving existing numbers if missing in CSV
         const numRow = { ...row };
-        if (row.qty !== undefined && row.qty !== '') numRow.qty = Number(row.qty);
+        const parseNumVal = (val) => {
+          if (val === undefined || val === '') return null;
+          if (typeof val === 'string') {
+            val = val.replace(',', '.');
+            const floatVal = parseFloat(val);
+            if (!isNaN(floatVal)) return floatVal;
+          }
+          return Number(val);
+        };
+
+        const parsedQty = parseNumVal(row.qty);
+        if (parsedQty !== null && !isNaN(parsedQty)) numRow.qty = parsedQty;
         else if (existing) numRow.qty = existing.qty || 0;
         else numRow.qty = 0;
 
-        if (row.qtyMin !== undefined && row.qtyMin !== '') numRow.qtyMin = Number(row.qtyMin);
+        const parsedQtyMin = parseNumVal(row.qtyMin);
+        if (parsedQtyMin !== null && !isNaN(parsedQtyMin)) numRow.qtyMin = parsedQtyMin;
         else if (existing) numRow.qtyMin = existing.qtyMin || 0;
         else numRow.qtyMin = 0;
 
-        if (row.priceBuy !== undefined && row.priceBuy !== '') numRow.priceBuy = Number(row.priceBuy);
+        const parsedPriceBuy = parseNumVal(row.priceBuy);
+        if (parsedPriceBuy !== null && !isNaN(parsedPriceBuy)) numRow.priceBuy = parsedPriceBuy;
         else if (existing) numRow.priceBuy = existing.priceBuy || 0;
         else numRow.priceBuy = 0;
 
-        if (row.priceSell !== undefined && row.priceSell !== '') numRow.priceSell = Number(row.priceSell);
+        const parsedPriceSell = parseNumVal(row.priceSell);
+        if (parsedPriceSell !== null && !isNaN(parsedPriceSell)) numRow.priceSell = parsedPriceSell;
         else if (existing) numRow.priceSell = existing.priceSell || 0;
         else numRow.priceSell = 0;
 
@@ -351,7 +376,7 @@ const DB = (() => {
     },
     template() {
       return 'codice,barcode,nome,categoria,marca,quantita,quantita_minima,prezzo_acquisto,prezzo_vendita,fornitore,ubicazione,descrizione\n' +
-             'PRD001,8001234567890,Esempio Prodotto,Categoria,Marca,10,5,10.00,19.99,Fornitore Srl,A-01-01,Descrizione prodotto\n';
+        'PRD001,8001234567890,Esempio Prodotto,Categoria,Marca,10,5,10.00,19.99,Fornitore Srl,A-01-01,Descrizione prodotto\n';
     }
   };
 
@@ -411,7 +436,7 @@ const DB = (() => {
       const handle = await this.getDirectoryHandle();
       const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '');
       const dateStr = new Date().toISOString().slice(0, 10);
-      
+
       let gotPermission = false;
       if (handle) {
         try {
@@ -492,11 +517,11 @@ const DB = (() => {
 
       const nowVal = new Date();
       const hours = nowVal.getHours();
-      
+
       if (hours >= 19) {
         const todayStr = new Date().toISOString().slice(0, 10);
         const lastBackupDate = localStorage.getItem('agavewms_last_auto_backup_date');
-        
+
         if (lastBackupDate !== todayStr) {
           localStorage.setItem('agavewms_last_auto_backup_date', todayStr);
           App.toast('⏰ Avvio backup automatico...', 'info');
@@ -513,7 +538,7 @@ const DB = (() => {
       const key = PREFIX + 'backup_daily_' + todayStr;
       if (!localStorage.getItem(key)) {
         const data = {
-          version:'1.0', exported:now(),
+          version: '1.0', exported: now(),
           products: Products.all(), movements: Movements.all(),
           users: Users.all(), settings: Settings.get(), counters: load(KEYS.counters)
         };
@@ -528,7 +553,7 @@ const DB = (() => {
     },
     autoBackup() {
       const data = {
-        version:'1.0', exported:now(),
+        version: '1.0', exported: now(),
         products: Products.all(),
         movements: Movements.all(),
         users: Users.all(),
@@ -583,13 +608,13 @@ const DB = (() => {
     },
     export() {
       const data = {
-        version:'1.0', exported:now(),
+        version: '1.0', exported: now(),
         products: Products.all(),
         movements: Movements.all(),
         users: Users.all(),
         settings: Settings.get()
       };
-      const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `agavewms_backup_${today()}.json`;
@@ -607,7 +632,7 @@ const DB = (() => {
 
   // Helper to trigger backup after mutation
   function mutate(fn) {
-    return function(...args) {
+    return function (...args) {
       const res = fn.apply(this, args);
       Backup.autoBackup();
       return res;

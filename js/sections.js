@@ -129,6 +129,7 @@ const Sections = (() => {
 <div class="page-header">
   <h1>Prodotti <span id="prod-count-badge" style="color:var(--text2);font-size:1rem;font-weight:400">(${prods.length})</span></h1>
   <div class="actions">
+    ${canEdit?`<button id="btn-edit-selected" class="btn hidden" style="background-color: var(--blue); color: white;" onclick="Sections.openMassEditForm()">✏️ Modifica Selezionati</button>`:''}
     ${canDel?`<button id="btn-delete-selected" class="btn btn-danger hidden" onclick="Sections.deleteSelectedProducts()">🗑️ Elimina Selezionati</button>`:''}
     ${canEdit?`<button class="btn btn-primary" onclick="Sections.openProductForm()">
       ➕ Nuovo Prodotto</button>`:''}
@@ -348,12 +349,30 @@ const Sections = (() => {
   }
 
   function deleteProduct(id) {
+    if (!id) {
+      // Attempt to find a product with code "undefined"
+      const maybeProd = DB.Products.all().find(prod => prod.code === 'undefined' || prod.code === undefined);
+      if (maybeProd) {
+        id = maybeProd.id;
+      } else {
+        App.toast('ID prodotto non valido','error');
+        return;
+      }
+    }
     const p = DB.Products.find(id);
-    App.confirm(`Eliminare il prodotto "${p?.name}"? L'operazione non è reversibile.`, () => {
-      DB.Products.delete(id); App.toast('Prodotto eliminato','warning'); App.updateNotifications();
-      const el = document.getElementById('section-products');
-      if (el) el.innerHTML = '';
-      renderProducts();
+    if (!p) {
+      App.toast('Prodotto non trovato','error');
+      return;
+    }
+    App.confirm(`Eliminare il prodotto "${p.name}"? L'operazione non è reversibile.`, () => {
+      DB.Products.delete(id);
+      App.toast('Prodotto eliminato','warning');
+      App.updateNotifications();
+      // Refresh the product list view if currently displayed
+      const currentSection = document.getElementById('section-products');
+      if (currentSection) {
+        renderProducts();
+      }
     });
   }
 
@@ -364,14 +383,24 @@ const Sections = (() => {
   }
 
   function updateDeleteSelectedButton() {
-    const btn = document.getElementById('btn-delete-selected');
+    const btnDel = document.getElementById('btn-delete-selected');
+    const btnEdit = document.getElementById('btn-edit-selected');
     const checked = document.querySelectorAll('.prod-checkbox:checked');
-    if (btn) {
+    
+    if (btnDel) {
       if (checked.length > 0) {
-        btn.classList.remove('hidden');
-        btn.textContent = `🗑️ Elimina Selezionati (${checked.length})`;
+        btnDel.classList.remove('hidden');
+        btnDel.textContent = `🗑️ Elimina Selezionati (${checked.length})`;
       } else {
-        btn.classList.add('hidden');
+        btnDel.classList.add('hidden');
+      }
+    }
+    if (btnEdit) {
+      if (checked.length > 0) {
+        btnEdit.classList.remove('hidden');
+        btnEdit.textContent = `✏️ Modifica Selezionati (${checked.length})`;
+      } else {
+        btnEdit.classList.add('hidden');
       }
     }
     const selectAll = document.getElementById('prod-select-all');
@@ -397,6 +426,62 @@ const Sections = (() => {
     });
   }
 
+  function openMassEditForm() {
+    const checked = document.querySelectorAll('.prod-checkbox:checked');
+    if (checked.length === 0) return;
+    const ids = Array.from(checked).map(cb => parseInt(cb.value, 10));
+
+    const formHTML = `
+      <form onsubmit="Sections.saveMassEdit(event, [${ids.join(',')}])">
+        <p style="margin-bottom:15px; color:var(--text2)">Lascia vuoto il campo se non vuoi modificarlo.</p>
+        <div class="form-group">
+          <label>Nuova Marca</label>
+          <input type="text" id="mass-brand" placeholder="Es. La Saponaria" />
+        </div>
+        <div class="form-group">
+          <label>Nuovo Modello</label>
+          <input type="text" id="mass-model" placeholder="Es. 100 ml" />
+        </div>
+        <div style="margin-top:20px;text-align:right">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>
+          <button type="submit" class="btn btn-primary">Applica Modifica</button>
+        </div>
+      </form>
+    `;
+    App.openModal(`Modifica Massiva (${ids.length} prodotti)`, formHTML);
+  }
+
+  function saveMassEdit(e, ids) {
+    e.preventDefault();
+    const newBrand = document.getElementById('mass-brand').value.trim();
+    const newModel = document.getElementById('mass-model').value.trim();
+
+    if (!newBrand && !newModel) {
+      App.toast('Nessuna modifica inserita', 'info');
+      App.closeModal();
+      return;
+    }
+
+    let updatedCount = 0;
+    ids.forEach(id => {
+      const p = DB.Products.find(id);
+      if (p) {
+        const updateData = {};
+        if (newBrand) updateData.brand = newBrand;
+        if (newModel) updateData.model = newModel;
+        DB.Products.update(id, updateData);
+        updatedCount++;
+      }
+    });
+
+    App.toast(`${updatedCount} prodotti aggiornati`, 'success');
+    App.closeModal();
+    App.updateNotifications();
+    const el = document.getElementById('section-products');
+    if (el) el.innerHTML = '';
+    renderProducts();
+  }
+
   function exportProducts() {
     const prods = DB.Products.filter(prodFilters);
     const headers = ['barcode','nome','marca','modello','quantita','quantita_minima','descrizione'];
@@ -411,6 +496,7 @@ const Sections = (() => {
   return { render, renderDashboard, renderProducts, setProdFilter, resetProdFilters,
     openProductForm, editProduct, saveProduct, duplicateProduct, deleteProduct, exportProducts,
     toggleProdSort, getSortArrow, toggleAllProducts, updateDeleteSelectedButton, deleteSelectedProducts,
+    openMassEditForm, saveMassEdit,
     prefillInbound: () => {}, prefillOutbound: () => {},
     renderInbound:()=>{}, renderOutbound:()=>{}, renderMovements:()=>{},
     renderCSV:()=>{}, renderReports:()=>{}, renderSettings:()=>{} };
