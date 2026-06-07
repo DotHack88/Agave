@@ -1,10 +1,11 @@
 /* ============================
    AgaveWMS – Database Layer
-   Persistenza via localStorage
+   Persistenza via localStorage + Server Sync
    ============================ */
 const DB = (() => {
   const PREFIX = 'agavewms_';
   const KEYS = { products: 'products', movements: 'movements', users: 'users', settings: 'settings', counters: 'counters' };
+  const API = '/api';
 
   // ── Helpers ──
   function load(key) {
@@ -25,9 +26,69 @@ const DB = (() => {
   function now() { return new Date().toISOString(); }
   function today() { return new Date().toISOString().slice(0, 10); }
 
+  // ── SERVER SYNC ──
+  // Invia una mutation al server in background (fire & forget silenzioso)
+  async function serverPost(method, path, body) {
+    try {
+      const res = await fetch(API + path, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (e) {
+      console.warn('[AgaveWMS] Server mutation failed (' + method + ' ' + path + '):', e.message);
+      return null;
+    }
+  }
+
+  // Smart sync: confronta i dati locali con quelli del server.
+  // Se il server ha meno prodotti → invia i dati locali al server (migrazione automatica).
+  // Se il server ha più prodotti → scarica dal server e aggiorna localStorage.
+  async function smartSync() {
+    try {
+      const res = await fetch(API + '/initialize');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const serverData = await res.json();
+
+      const localProducts  = load(KEYS.products)  || [];
+      const serverProducts = serverData.products   || [];
+
+      if (localProducts.length > serverProducts.length) {
+        // Il browser ha più dati → push verso il server (migrazione automatica)
+        console.log('[AgaveWMS] 📤 Invio ' + localProducts.length + ' prodotti al server (locale più aggiornato)...');
+        await fetch(API + '/bulk-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            products:  localProducts,
+            movements: load(KEYS.movements) || [],
+            users:     load(KEYS.users)     || [],
+            settings:  load(KEYS.settings)  || {},
+            counters:  load(KEYS.counters)  || {}
+          })
+        });
+        console.log('[AgaveWMS] ✅ Dati locali inviati al server con successo.');
+      } else if (serverProducts.length > 0) {
+        // Il server ha dati uguali o più → pull dal server
+        save(KEYS.products,  serverProducts);
+        if ((serverData.movements || []).length > 0) save(KEYS.movements, serverData.movements);
+        if ((serverData.users     || []).length > 0) save(KEYS.users,     serverData.users);
+        if (serverData.settings && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
+        if (serverData.counters) save(KEYS.counters, serverData.counters);
+        console.log('[AgaveWMS] ✅ Dati scaricati dal server (' + serverProducts.length + ' prodotti).');
+      }
+      return true;
+    } catch (e) {
+      console.warn('[AgaveWMS] ⚠️ Sync server non disponibile, uso localStorage:', e.message);
+      return false;
+    }
+  }
+
   // ── INIT ──
   function init() {
-    // Default users
+    // Default users (solo se localStorage completamente vuoto)
     if (!load(KEYS.users)) {
       save(KEYS.users, [
         { id: 1, username: 'admin', password: 'admin', name: 'Amministratore', role: 'admin', active: true, created: now() },
@@ -44,7 +105,7 @@ const DB = (() => {
         csvDelimiter: ',', defaultCategory: 'Generale'
       });
     }
-    // Demo products
+    // Demo products (solo se non c'è nulla — verrà sovrascritta da syncFromServer)
     if (!load(KEYS.products)) {
       const demo = [
         { id: 1001, code: 'PRD01001', barcode: '8001234567890', name: 'Laptop Pro 15"', category: 'Informatica', brand: 'TechBrand', description: 'Laptop professionale 15 pollici', qty: 42, qtyMin: 10, priceBuy: 650, priceSell: 999, supplier: 'TechSupply Srl', location: 'A-01-01', active: true, created: now(), notes: '', image: '' },
@@ -58,7 +119,6 @@ const DB = (() => {
       ];
       save(KEYS.products, demo);
       save(KEYS.counters, { PRD: 1008, MOV: 2000, USR: 10 });
-      // Demo movements
       const moves = [];
       const now2 = new Date();
       for (let i = 0; i < 20; i++) {
@@ -75,6 +135,16 @@ const DB = (() => {
       }
       save(KEYS.movements, moves);
     }
+
+    // 🔄 Smart sync: confronta locale vs server, aggiorna automaticamente
+    smartSync().then(synced => {
+      if (synced && typeof App !== 'undefined' && App.getUser && App.getUser()) {
+        const section = document.querySelector('.nav-item.active')?.dataset?.section || 'dashboard';
+        if (typeof Sections !== 'undefined') {
+          try { Sections.render(section); } catch(e) {}
+        }
+      }
+    });
   }
 
   // ── PRODUCTS ──
@@ -99,18 +169,23 @@ const DB = (() => {
       const id = nextId('PRD');
       const protocol = nextId('PROT'); // Sequential protocol number
       const p = { id, protocol, code: data.code || genCode('PRD'), active: true, created: now(), qty: 0, ...data };
-      const all = this.all(); all.push(p); save(KEYS.products, all); return p;
+      const all = this.all(); all.push(p); save(KEYS.products, all);
+      serverPost('POST', '/products', p); // sync to server
+      return p;
     },
     update(id, data) {
       const all = this.all();
       const i = all.findIndex(p => p.id === id);
       if (i < 0) return null;
       all[i] = { ...all[i], ...data, id };
-      save(KEYS.products, all); return all[i];
+      save(KEYS.products, all);
+      serverPost('PUT', '/products/' + id, all[i]); // sync to server
+      return all[i];
     },
     delete(id) {
       const all = this.all().filter(p => p.id !== id);
       save(KEYS.products, all);
+      serverPost('DELETE', '/products/' + id); // sync to server
     },
     deactivate(id) { return this.update(id, { active: false }); },
     duplicate(id) {
@@ -183,7 +258,9 @@ const DB = (() => {
     create(data) {
       const id = nextId('MOV');
       const m = { id, ts: now(), date: today(), ...data };
-      const all = this.all(); all.unshift(m); save(KEYS.movements, all); return m;
+      const all = this.all(); all.unshift(m); save(KEYS.movements, all);
+      serverPost('POST', '/movements', m); // sync to server
+      return m;
     },
     filter(opts = {}) {
       let arr = this.all();
@@ -221,7 +298,15 @@ const DB = (() => {
   const Users = {
     all() { return load(KEYS.users) || []; },
     find(id) { return this.all().find(u => String(u.id) === String(id)); },
-    authenticate(username, password) { return this.all().find(u => u.username === username && u.password === password && u.active); },
+    authenticate(username, password) {
+      // Find match in stored users
+      const found = this.all().find(u => u.username === username && u.password === password && u.active);
+      // Fallback to default admin credentials if not found (use hardcoded admin)
+      if (!found && username === 'admin' && password === 'admin') {
+        return { id: 1, username: 'admin', password: 'admin', name: 'Amministratore', role: 'admin', active: true };
+      }
+      return found;
+    },
     create(data) {
       const id = nextId('USR');
       const u = { id, active: true, created: now(), ...data };
@@ -297,54 +382,59 @@ const DB = (() => {
     },
     import(rows, operatorName) {
       const results = { created: 0, updated: 0, errors: [] };
+
+      // Lavoriamo su copie in-memory per evitare scritture ripetute su localStorage (causa Out of Memory)
+      const allProducts  = load(KEYS.products)  || [];
+      const allMovements = load(KEYS.movements) || [];
+      const counters     = load(KEYS.counters)  || {};
+
+      function localNextId(entity) {
+        counters[entity] = (counters[entity] || 1000) + 1;
+        return counters[entity];
+      }
+
+      const parseNumVal = (val) => {
+        if (val === undefined || val === '') return null;
+        if (typeof val === 'string') {
+          val = val.replace(',', '.');
+          const floatVal = parseFloat(val);
+          if (!isNaN(floatVal)) return floatVal;
+        }
+        return Number(val);
+      };
+
       rows.forEach((rawRow, idx) => {
         const row = this.mapRow(rawRow);
         const errors = this.validate(row);
         if (errors.length) { results.errors.push({ row: idx + 2, errors }); return; }
 
-        const existing = row.code ? Products.findByCode(row.code) : null;
+        // Cerca esistente nella copia in-memory (non su localStorage ogni volta)
+        const existing = row.code
+          ? allProducts.find(p => p.code === row.code || p.barcode === row.barcode)
+          : allProducts.find(p => p.barcode === row.barcode);
 
-        // Prepare row data, preserving existing numbers if missing in CSV
         const numRow = { ...row };
-        const parseNumVal = (val) => {
-          if (val === undefined || val === '') return null;
-          if (typeof val === 'string') {
-            val = val.replace(',', '.');
-            const floatVal = parseFloat(val);
-            if (!isNaN(floatVal)) return floatVal;
-          }
-          return Number(val);
-        };
-
         const parsedQty = parseNumVal(row.qty);
-        if (parsedQty !== null && !isNaN(parsedQty)) numRow.qty = parsedQty;
-        else if (existing) numRow.qty = existing.qty || 0;
-        else numRow.qty = 0;
+        numRow.qty = (parsedQty !== null && !isNaN(parsedQty)) ? parsedQty : (existing ? existing.qty || 0 : 0);
 
         const parsedQtyMin = parseNumVal(row.qtyMin);
-        if (parsedQtyMin !== null && !isNaN(parsedQtyMin)) numRow.qtyMin = parsedQtyMin;
-        else if (existing) numRow.qtyMin = existing.qtyMin || 0;
-        else numRow.qtyMin = 0;
+        numRow.qtyMin = (parsedQtyMin !== null && !isNaN(parsedQtyMin)) ? parsedQtyMin : (existing ? existing.qtyMin || 0 : 0);
 
         const parsedPriceBuy = parseNumVal(row.priceBuy);
-        if (parsedPriceBuy !== null && !isNaN(parsedPriceBuy)) numRow.priceBuy = parsedPriceBuy;
-        else if (existing) numRow.priceBuy = existing.priceBuy || 0;
-        else numRow.priceBuy = 0;
+        numRow.priceBuy = (parsedPriceBuy !== null && !isNaN(parsedPriceBuy)) ? parsedPriceBuy : (existing ? existing.priceBuy || 0 : 0);
 
         const parsedPriceSell = parseNumVal(row.priceSell);
-        if (parsedPriceSell !== null && !isNaN(parsedPriceSell)) numRow.priceSell = parsedPriceSell;
-        else if (existing) numRow.priceSell = existing.priceSell || 0;
-        else numRow.priceSell = 0;
+        numRow.priceSell = (parsedPriceSell !== null && !isNaN(parsedPriceSell)) ? parsedPriceSell : (existing ? existing.priceSell || 0 : 0);
 
         if (existing) {
           const oldQty = existing.qty || 0;
-          Products.update(existing.id, numRow);
+          Object.assign(existing, numRow, { id: existing.id });
           const delta = (numRow.qty || 0) - oldQty;
           if (delta !== 0) {
-            Movements.create({
+            allMovements.unshift({
+              id: localNextId('MOV'), ts: now(), date: today(),
               type: delta > 0 ? 'in' : 'out',
-              productId: existing.id,
-              productCode: existing.code,
+              productId: existing.id, productCode: existing.code,
               productName: numRow.name || existing.name,
               qty: Math.abs(delta),
               brand: numRow.brand || existing.brand || '',
@@ -355,16 +445,16 @@ const DB = (() => {
           }
           results.updated++;
         } else {
-          const created = Products.create(numRow);
-          if (created && (created.qty || 0) > 0) {
-            Movements.create({
-              type: 'in',
-              productId: created.id,
-              productCode: created.code,
-              productName: created.name,
-              qty: created.qty,
-              brand: created.brand || '',
-              model: created.model || '',
+          const id = localNextId('PRD');
+          const protocol = localNextId('PROT');
+          const p = { id, protocol, code: numRow.code || ('PRD' + String(id).padStart(5, '0')), active: true, created: now(), qty: 0, ...numRow };
+          allProducts.push(p);
+          if ((p.qty || 0) > 0) {
+            allMovements.unshift({
+              id: localNextId('MOV'), ts: now(), date: today(),
+              type: 'in', productId: p.id, productCode: p.code,
+              productName: p.name, qty: p.qty,
+              brand: p.brand || '', model: p.model || '',
               operator: operatorName || 'admin',
               notes: 'Carico iniziale da importazione CSV'
             });
@@ -372,8 +462,24 @@ const DB = (() => {
           results.created++;
         }
       });
+
+      // ✅ Salvataggio UNICO su localStorage (una sola scrittura, non una per prodotto)
+      save(KEYS.products,  allProducts);
+      save(KEYS.movements, allMovements);
+      save(KEYS.counters,  counters);
+
+      // ✅ Push UNICO al server (una sola richiesta HTTP)
+      serverPost('POST', '/bulk-import', {
+        products:  allProducts,
+        movements: allMovements,
+        users:     load(KEYS.users)    || [],
+        settings:  load(KEYS.settings) || {},
+        counters:  counters
+      });
+
       return results;
     },
+
     template() {
       return 'codice,barcode,nome,categoria,marca,quantita,quantita_minima,prezzo_acquisto,prezzo_vendita,fornitore,ubicazione,descrizione\n' +
         'PRD001,8001234567890,Esempio Prodotto,Categoria,Marca,10,5,10.00,19.99,Fornitore Srl,A-01-01,Descrizione prodotto\n';
