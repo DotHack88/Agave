@@ -299,10 +299,10 @@ const DB = (() => {
     all() { return load(KEYS.users) || []; },
     find(id) { return this.all().find(u => String(u.id) === String(id)); },
     authenticate(username, password) {
-      // Find match in stored users
-      const found = this.all().find(u => u.username === username && u.password === password && u.active);
-      // Fallback to default admin credentials if not found (use hardcoded admin)
-      if (!found && username === 'admin' && password === 'admin') {
+      const userLower = (username || '').trim().toLowerCase();
+      const passTrim = (password || '').trim();
+      const found = this.all().find(u => (u.username || '').toLowerCase() === userLower && u.password === passTrim && u.active);
+      if (!found && userLower === 'admin' && passTrim === 'admin') {
         return { id: 1, username: 'admin', password: 'admin', name: 'Amministratore', role: 'admin', active: true };
       }
       return found;

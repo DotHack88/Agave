@@ -12,7 +12,7 @@ Object.assign(Sections, {
   },
   prefillOutbound(id) {
     const p = DB.Products.find(id);
-    if (p) this.addToOutboundCart(p);
+    if (p) this.instantOutbound(p);
   },
 
   // ── INBOUND CART ACTIONS ──
@@ -99,8 +99,7 @@ Object.assign(Sections, {
   handleOutboundBarcode(barcode) {
     const p = DB.Products.findByCode(barcode);
     if (p) {
-      this.addToOutboundCart(p);
-      App.toast(`➖ ${p.name} aggiunto alla lista`, 'success');
+      this.instantOutbound(p);
     } else {
       App.toast(`⚠ Barcode non registrato: ${barcode}`, 'warning');
       App.openModal('Prodotto Non Trovato', `
@@ -111,6 +110,37 @@ Object.assign(Sections, {
         <button class="btn btn-primary" onclick="App.closeModal();App.navigate('products');Sections.openProductForm({barcode:'${App.escape(barcode)}'})">➕ Crea Prodotto</button>
       `);
     }
+  },
+
+  // ── SCARICO IMMEDIATO (senza passare dal carrello) ──
+  instantOutbound(product, qty = 1) {
+    // Rileggiamo il prodotto dal DB per avere la giacenza aggiornata
+    const freshProduct = DB.Products.find(product.id);
+    if (!freshProduct) { App.toast('Prodotto non trovato', 'error'); return; }
+    if ((freshProduct.qty || 0) < qty) {
+      App.toast(`Quantità insufficiente per "${freshProduct.name}"! Disponibili: ${freshProduct.qty} pz`, 'error');
+      return;
+    }
+    const operator = App.getUser()?.name || 'admin';
+    const dateVal = new Date().toISOString().slice(0, 10);
+    // Registra il movimento di uscita
+    DB.Movements.create({
+      type: 'out',
+      productId: freshProduct.id,
+      productCode: freshProduct.code,
+      productName: freshProduct.name,
+      qty: qty,
+      brand: freshProduct.brand || '',
+      model: freshProduct.model || '',
+      date: dateVal,
+      operator: operator,
+      notes: 'Scarico immediato da scansione'
+    });
+    // Aggiorna la giacenza
+    DB.Products.updateQty(freshProduct.id, -qty);
+    App.toast(`📤 Scaricato ${qty}x ${freshProduct.name} (Rimanenti: ${freshProduct.qty - qty})`, 'success');
+    App.updateNotifications();
+    this.renderOutbound();
   },
 
   // ── INBOUND VIEW ──
@@ -365,10 +395,14 @@ Object.assign(Sections, {
   selectOutboundSearchProd(id) {
     const p = DB.Products.find(id);
     if (p) {
-      this.addToOutboundCart(p);
-      document.getElementById('ob-search-input').value = '';
-      document.getElementById('ob-search-results').classList.add('hidden');
-      document.getElementById('ob-search-input').focus();
+      this.instantOutbound(p);
+      const searchInput = document.getElementById('ob-search-input');
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+      }
+      const searchResults = document.getElementById('ob-search-results');
+      if (searchResults) searchResults.classList.add('hidden');
     }
   },
 

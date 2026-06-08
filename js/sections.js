@@ -497,7 +497,37 @@ const Sections = (() => {
     openProductForm, editProduct, saveProduct, duplicateProduct, deleteProduct, exportProducts,
     toggleProdSort, getSortArrow, toggleAllProducts, updateDeleteSelectedButton, deleteSelectedProducts,
     openMassEditForm, saveMassEdit,
-    prefillInbound: () => {}, prefillOutbound: () => {},
+    prefillInbound: () => {},
+    prefillOutbound: (productId) => {
+      const p = DB.Products.find(productId);
+      if (!p) { App.toast('Prodotto non trovato','error'); return; }
+      const qty = 1; // default quantity to subtract
+      if ((p.qty || 0) < qty) {
+        App.toast('Quantità insufficiente per lo scarico','error');
+        return;
+      }
+      // Update product quantity
+      DB.Products.update(productId, { qty: (p.qty || 0) - qty });
+      // Register outbound movement
+      DB.Movements.create({
+        type: 'out',
+        productId: p.id,
+        productCode: p.code,
+        productName: p.name,
+        qty: qty,
+        brand: p.brand || '',
+        model: p.model || '',
+        operator: App.getUser()?.name || 'admin',
+        notes: 'Scarico rapido da lista prodotti'
+      });
+      App.toast(`Scaricato ${qty} ${p.name}`, 'success');
+      App.updateNotifications();
+      // Refresh UI if currently on outbound tab
+      if (document.getElementById('section-outbound')) {
+        Sections.renderOutbound();
+      }
+    },
+    renderInbound:()=>{}, renderOutbound:()=>{}, renderMovements:()=>{},
     renderInbound:()=>{}, renderOutbound:()=>{}, renderMovements:()=>{},
     renderCSV:()=>{}, renderReports:()=>{}, renderSettings:()=>{} };
 })();
