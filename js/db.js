@@ -45,22 +45,21 @@ const DB = (() => {
       const serverProducts = serverData.products || [];
       const localProducts  = load(KEYS.products) || [];
 
-      // Se il server è vuoto ma il locale ha dati → push iniziale (migrazione)
-      if (serverProducts.length === 0 && localProducts.length > 0) {
-        console.log('[AgaveWMS] 📤 Server vuoto, invio ' + localProducts.length + ' prodotti...');
+      // Se il server non è MAI stato inizializzato (è vergine) e il locale ha dati → push iniziale (migrazione)
+      if (!serverData.initialized && localProducts.length > 0) {
+        console.log('[AgaveWMS] 📤 Server vuoto (nuovo), invio ' + localProducts.length + ' prodotti...');
         await pushToServer();
         return true;
       }
 
-      // Altrimenti il server è la fonte di verità → scarica SEMPRE
-      if (serverProducts.length > 0) {
-        save(KEYS.products,  serverProducts);
-      }
-      if (serverData.movements)  save(KEYS.movements, serverData.movements);
+      // Altrimenti il server è la fonte di verità → scarica SEMPRE (anche se vuoto, per rispettare le eliminazioni)
+      save(KEYS.products, serverData.products || []);
+      save(KEYS.movements, serverData.movements || []);
       if (serverData.users && serverData.users.length > 0) save(KEYS.users, serverData.users);
       if (serverData.settings && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
-      if (serverData.counters)   save(KEYS.counters,  serverData.counters);
-      console.log('[AgaveWMS] ✅ Dati scaricati dal server (' + serverProducts.length + ' prodotti, ' + (serverData.movements || []).length + ' movimenti).');
+      if (serverData.counters) save(KEYS.counters, serverData.counters);
+      
+      console.log('[AgaveWMS] ✅ Dati scaricati dal server (' + (serverData.products || []).length + ' prodotti).');
       return true;
     } catch (e) {
       console.warn('[AgaveWMS] ⚠️ Sync server non disponibile, uso localStorage:', e.message);
@@ -78,6 +77,7 @@ const DB = (() => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          initialized: true, // Questo flag indica che il server non è più vergine
           products:  load(KEYS.products)  || [],
           movements: load(KEYS.movements) || [],
           users:     load(KEYS.users)     || [],
@@ -99,12 +99,13 @@ const DB = (() => {
       const res = await fetch(FIREBASE_URL + '/data.json');
       if (!res.ok) return;
       const serverData = (await res.json()) || {};
-      const serverProducts = serverData.products || [];
-      if (serverProducts.length > 0) {
-        save(KEYS.products,  serverProducts);
+      
+      // Quando fa il polling, accetta anche liste vuote (se un altro utente ha cancellato tutto)
+      if (serverData.initialized) {
+        save(KEYS.products, serverData.products || []);
+        save(KEYS.movements, serverData.movements || []);
+        if (serverData.counters) save(KEYS.counters, serverData.counters);
       }
-      if (serverData.movements) save(KEYS.movements, serverData.movements);
-      if (serverData.counters)  save(KEYS.counters,  serverData.counters);
       // Rinfresca la UI se l'utente è loggato
       if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
         const section = document.querySelector('.nav-item.active')?.dataset?.section;
