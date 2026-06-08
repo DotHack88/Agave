@@ -134,7 +134,6 @@ const Sections = (() => {
     ${canEdit?`<button class="btn btn-primary" onclick="Sections.openProductForm()">
       ➕ Nuovo Prodotto</button>`:''}
           <button class="btn btn-ghost" onclick="Sections.exportProducts()">⬇ Esporta</button>
-     <button class="btn btn-ghost btn-sm" onclick="SectionsCSV.openImportModal()">📂 Importa CSV</button>
   </div>
 </div>
 <div class="filters-bar">
