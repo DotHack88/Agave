@@ -36,6 +36,7 @@ const DB = (() => {
   // All'avvio: SEMPRE scarica dal server.
   // Dopo ogni mutazione: SEMPRE invia tutto al server.
   let _syncInProgress = false;
+  let _syncPending = false;
 
   async function pullFromServer() {
     try {
@@ -69,8 +70,12 @@ const DB = (() => {
 
   // Invia TUTTO lo stato locale al server (dopo ogni mutazione)
   async function pushToServer() {
-    if (_syncInProgress) return;
+    if (_syncInProgress) {
+      _syncPending = true;
+      return;
+    }
     _syncInProgress = true;
+    _syncPending = false;
     try {
       // Usiamo PUT per sovrascrivere interamente il nodo /data in Firebase
       await fetch(FIREBASE_URL + '/data.json', {
@@ -89,6 +94,9 @@ const DB = (() => {
       console.warn('[AgaveWMS] Push al server fallito:', e.message);
     } finally {
       _syncInProgress = false;
+      if (_syncPending) {
+        pushToServer();
+      }
     }
   }
 
@@ -494,14 +502,8 @@ const DB = (() => {
       save(KEYS.movements, allMovements);
       save(KEYS.counters,  counters);
 
-      // ✅ Push UNICO al server (una sola richiesta HTTP)
-      serverPost('POST', '/bulk-import', {
-        products:  allProducts,
-        movements: allMovements,
-        users:     load(KEYS.users)    || [],
-        settings:  load(KEYS.settings) || {},
-        counters:  counters
-      });
+      // ✅ Push UNICO al server Firebase (una sola richiesta HTTP)
+      pushToServer();
 
       return results;
     },
