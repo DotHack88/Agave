@@ -30,22 +30,7 @@ const DB = (() => {
   function today() { return new Date().toISOString().slice(0, 10); }
 
   // ── SERVER SYNC ──
-  // Invia una mutation al server (Firebase REST API)
-  async function serverPost(method, path, body) {
-    try {
-      // Firebase REST API usa path.json
-      const res = await fetch(FIREBASE_URL + path + '.json', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
-    } catch (e) {
-      console.warn('[AgaveWMS] Server mutation failed (' + method + ' ' + path + '):', e.message);
-      return null;
-    }
-  }
+  // Tutte le chiamate ora passano per pushToServer() che sincronizza interamente il DB in Firebase
 
   // ── SYNC: Il server (data.json) è la UNICA fonte di verità ──
   // All'avvio: SEMPRE scarica dal server.
@@ -214,7 +199,6 @@ const DB = (() => {
       const protocol = nextId('PROT'); // Sequential protocol number
       const p = { id, protocol, code: data.code || genCode('PRD'), active: true, created: now(), qty: 0, ...data };
       const all = this.all(); all.push(p); save(KEYS.products, all);
-      serverPost('POST', '/products', p); // sync to server
       return p;
     },
     update(id, data) {
@@ -223,13 +207,11 @@ const DB = (() => {
       if (i < 0) return null;
       all[i] = { ...all[i], ...data, id };
       save(KEYS.products, all);
-      serverPost('PUT', '/products/' + id, all[i]); // sync to server
       return all[i];
     },
     delete(id) {
       const all = this.all().filter(p => p.id !== id);
       save(KEYS.products, all);
-      serverPost('DELETE', '/products/' + id); // sync to server
     },
     deactivate(id) { return this.update(id, { active: false }); },
     duplicate(id) {
@@ -303,7 +285,6 @@ const DB = (() => {
       const id = nextId('MOV');
       const m = { id, ts: now(), date: today(), ...data };
       const all = this.all(); all.unshift(m); save(KEYS.movements, all);
-      serverPost('POST', '/movements', m); // sync to server
       return m;
     },
     filter(opts = {}) {
