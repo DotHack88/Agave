@@ -43,48 +43,87 @@ const DB = (() => {
     }
   }
 
-  // Smart sync: confronta i dati locali con quelli del server.
-  // Se il server ha meno prodotti → invia i dati locali al server (migrazione automatica).
-  // Se il server ha più prodotti → scarica dal server e aggiorna localStorage.
-  async function smartSync() {
+  // ── SYNC: Il server (data.json) è la UNICA fonte di verità ──
+  // All'avvio: SEMPRE scarica dal server.
+  // Dopo ogni mutazione: SEMPRE invia tutto al server.
+  let _syncInProgress = false;
+
+  async function pullFromServer() {
     try {
       const res = await fetch(API + '/initialize');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const serverData = await res.json();
+      const serverProducts = serverData.products || [];
+      const localProducts  = load(KEYS.products) || [];
 
-      const localProducts  = load(KEYS.products)  || [];
-      const serverProducts = serverData.products   || [];
-
-      if (localProducts.length > serverProducts.length) {
-        // Il browser ha più dati → push verso il server (migrazione automatica)
-        console.log('[AgaveWMS] 📤 Invio ' + localProducts.length + ' prodotti al server (locale più aggiornato)...');
-        await fetch(API + '/bulk-import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            products:  localProducts,
-            movements: load(KEYS.movements) || [],
-            users:     load(KEYS.users)     || [],
-            settings:  load(KEYS.settings)  || {},
-            counters:  load(KEYS.counters)  || {}
-          })
-        });
-        console.log('[AgaveWMS] ✅ Dati locali inviati al server con successo.');
-      } else if (serverProducts.length > 0) {
-        // Il server ha dati uguali o più → pull dal server
-        save(KEYS.products,  serverProducts);
-        if ((serverData.movements || []).length > 0) save(KEYS.movements, serverData.movements);
-        if ((serverData.users     || []).length > 0) save(KEYS.users,     serverData.users);
-        if (serverData.settings && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
-        if (serverData.counters) save(KEYS.counters, serverData.counters);
-        console.log('[AgaveWMS] ✅ Dati scaricati dal server (' + serverProducts.length + ' prodotti).');
+      // Se il server è vuoto ma il locale ha dati → push iniziale (migrazione)
+      if (serverProducts.length === 0 && localProducts.length > 0) {
+        console.log('[AgaveWMS] 📤 Server vuoto, invio ' + localProducts.length + ' prodotti...');
+        await pushToServer();
+        return true;
       }
+
+      // Altrimenti il server è la fonte di verità → scarica SEMPRE
+      if (serverProducts.length > 0) {
+        save(KEYS.products,  serverProducts);
+      }
+      if (serverData.movements)  save(KEYS.movements, serverData.movements);
+      if (serverData.users && serverData.users.length > 0) save(KEYS.users, serverData.users);
+      if (serverData.settings && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
+      if (serverData.counters)   save(KEYS.counters,  serverData.counters);
+      console.log('[AgaveWMS] ✅ Dati scaricati dal server (' + serverProducts.length + ' prodotti, ' + (serverData.movements || []).length + ' movimenti).');
       return true;
     } catch (e) {
       console.warn('[AgaveWMS] ⚠️ Sync server non disponibile, uso localStorage:', e.message);
       return false;
     }
   }
+
+  // Invia TUTTO lo stato locale al server (dopo ogni mutazione)
+  async function pushToServer() {
+    if (_syncInProgress) return;
+    _syncInProgress = true;
+    try {
+      await fetch(API + '/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products:  load(KEYS.products)  || [],
+          movements: load(KEYS.movements) || [],
+          users:     load(KEYS.users)     || [],
+          settings:  load(KEYS.settings)  || {},
+          counters:  load(KEYS.counters)  || {}
+        })
+      });
+    } catch (e) {
+      console.warn('[AgaveWMS] Push al server fallito:', e.message);
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  // Polling: scarica dal server ogni 30 secondi per rimanere allineati
+  setInterval(async () => {
+    if (_syncInProgress) return;
+    try {
+      const res = await fetch(API + '/initialize');
+      if (!res.ok) return;
+      const serverData = await res.json();
+      const serverProducts = serverData.products || [];
+      if (serverProducts.length > 0) {
+        save(KEYS.products,  serverProducts);
+      }
+      if (serverData.movements) save(KEYS.movements, serverData.movements);
+      if (serverData.counters)  save(KEYS.counters,  serverData.counters);
+      // Rinfresca la UI se l'utente è loggato
+      if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
+        const section = document.querySelector('.nav-item.active')?.dataset?.section;
+        if (section && typeof Sections !== 'undefined') {
+          try { Sections.render(section); } catch(e) {}
+        }
+      }
+    } catch(e) { /* silenzioso */ }
+  }, 30000);
 
   // ── INIT ──
   function init() {
@@ -136,8 +175,8 @@ const DB = (() => {
       save(KEYS.movements, moves);
     }
 
-    // 🔄 Smart sync: confronta locale vs server, aggiorna automaticamente
-    smartSync().then(synced => {
+    // 🔄 Sync: scarica SEMPRE dal server all'avvio (fonte di verità)
+    pullFromServer().then(synced => {
       if (synced && typeof App !== 'undefined' && App.getUser && App.getUser()) {
         const section = document.querySelector('.nav-item.active')?.dataset?.section || 'dashboard';
         if (typeof Sections !== 'undefined') {
@@ -736,11 +775,12 @@ const DB = (() => {
     }
   };
 
-  // Helper to trigger backup after mutation
+  // Helper to trigger backup + server push after mutation
   function mutate(fn) {
     return function (...args) {
       const res = fn.apply(this, args);
       Backup.autoBackup();
+      pushToServer(); // 🔄 Sync immediato al server dopo ogni modifica
       return res;
     };
   }
