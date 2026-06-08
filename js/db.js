@@ -5,7 +5,10 @@
 const DB = (() => {
   const PREFIX = 'agavewms_';
   const KEYS = { products: 'products', movements: 'movements', users: 'users', settings: 'settings', counters: 'counters' };
-  const API = '/api';
+  
+  // Sostituisci questo URL con quello del tuo Realtime Database (lo trovi nella scheda Realtime Database in alto)
+  // Assicurati che finisca senza la barra finale /
+  const FIREBASE_URL = 'https://agave-1c11a-default-rtdb.europe-west1.firebasedatabase.app';
 
   // ── Helpers ──
   function load(key) {
@@ -27,10 +30,11 @@ const DB = (() => {
   function today() { return new Date().toISOString().slice(0, 10); }
 
   // ── SERVER SYNC ──
-  // Invia una mutation al server in background (fire & forget silenzioso)
+  // Invia una mutation al server (Firebase REST API)
   async function serverPost(method, path, body) {
     try {
-      const res = await fetch(API + path, {
+      // Firebase REST API usa path.json
+      const res = await fetch(FIREBASE_URL + path + '.json', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined
@@ -50,9 +54,9 @@ const DB = (() => {
 
   async function pullFromServer() {
     try {
-      const res = await fetch(API + '/initialize');
+      const res = await fetch(FIREBASE_URL + '/data.json');
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const serverData = await res.json();
+      const serverData = (await res.json()) || {};
       const serverProducts = serverData.products || [];
       const localProducts  = load(KEYS.products) || [];
 
@@ -84,8 +88,9 @@ const DB = (() => {
     if (_syncInProgress) return;
     _syncInProgress = true;
     try {
-      await fetch(API + '/bulk-import', {
-        method: 'POST',
+      // Usiamo PUT per sovrascrivere interamente il nodo /data in Firebase
+      await fetch(FIREBASE_URL + '/data.json', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           products:  load(KEYS.products)  || [],
@@ -106,9 +111,9 @@ const DB = (() => {
   setInterval(async () => {
     if (_syncInProgress) return;
     try {
-      const res = await fetch(API + '/initialize');
+      const res = await fetch(FIREBASE_URL + '/data.json');
       if (!res.ok) return;
-      const serverData = await res.json();
+      const serverData = (await res.json()) || {};
       const serverProducts = serverData.products || [];
       if (serverProducts.length > 0) {
         save(KEYS.products,  serverProducts);
