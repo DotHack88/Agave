@@ -521,3 +521,52 @@ body.standalone-mode .main-content {
   }
 }
 
+/* ── CARICO CUMULATIVO DARK BLUE BG ── */
+.card-inbound-dark {
+  background: #0d1627 !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+.card-inbound-dark .card-title {
+  color: #60a5fa !important;
+  font-weight: 700;
+}
+.card-inbound-dark label b,
+.card-inbound-dark label {
+  color: #94a3b8 !important;
+}
+.card-inbound-dark input.form-control,
+.card-inbound-dark input[type="date"] {
+  background: #152035 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+.card-inbound-dark input.form-control::placeholder {
+  color: #64748b !important;
+}
+.card-inbound-dark table thead th {
+  color: #94a3b8 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1) !important;
+}
+.card-inbound-dark table tbody td {
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+.card-inbound-dark table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+.card-inbound-dark .td-code {
+  color: #38bdf8 !important;
+}
+.card-inbound-dark .btn-ghost {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e2e8f0 !important;
+}
+.card-inbound-dark .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+

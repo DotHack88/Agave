@@ -18093,6 +18093,34 @@
   ],
   "movements": [
     {
+      "id": 8375,
+      "ts": "2026-06-10T16:13:56.968Z",
+      "date": "2026-06-10",
+      "type": "in",
+      "productId": 23760,
+      "productCode": "PRD23760",
+      "productName": "Memo Sel MENS",
+      "qty": 1,
+      "brand": "Fitopreparatori Italiani",
+      "model": "30 cpr",
+      "operator": "Amministratore",
+      "notes": "Carico rapido"
+    },
+    {
+      "id": 8374,
+      "ts": "2026-06-10T16:13:49.804Z",
+      "date": "2026-06-10",
+      "type": "out",
+      "productId": 23760,
+      "productCode": "PRD23760",
+      "productName": "Memo Sel MENS",
+      "qty": 1,
+      "brand": "Fitopreparatori Italiani",
+      "model": "30 cpr",
+      "operator": "Amministratore",
+      "notes": "Scarico rapido"
+    },
+    {
       "id": 8374,
       "type": "out",
       "productId": 22618,
@@ -107723,7 +107751,7 @@
   },
   "counters": {
     "PRD": 23762,
-    "MOV": 8373,
+    "MOV": 8375,
     "USR": 10,
     "PROT": 11779
   }

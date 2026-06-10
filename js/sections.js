@@ -43,7 +43,7 @@ const Sections = (() => {
       <div class="recent-item">
         <div class="ri-dot ${m.type}"></div>
         <div class="ri-info">
-          <div class="ri-name">${App.escape(m.productName)}</div>
+          <div class="ri-name" style="cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div>
           <div class="ri-meta">${App.fmtDate(m.date)} • ${m.operator}</div>
         </div>
         <div class="ri-qty ${m.type}">${m.type==='in'?'+':'-'}${m.qty}</div>
@@ -64,7 +64,7 @@ const Sections = (() => {
       <div class="recent-item">
         <div class="ri-dot" style="background:var(${p.qty === 0 ? '--red' : '--yellow'})"></div>
         <div class="ri-info">
-          <div class="ri-name">${App.escape(p.name)}</div>
+          <div class="ri-name" style="cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</div>
           <div class="ri-meta">${p.code || '—'} • Min: ${p.qtyMin}</div>
           <div class="stock-bar" style="margin-top:4px;max-width:120px">
             <div class="stock-bar-track"><div class="stock-bar-fill ${stockClass}" style="width:${stockPct}%"></div></div>
@@ -72,8 +72,8 @@ const Sections = (() => {
         </div>
         <span class="badge ${badge}" style="margin-right:6px">${p.qty}</span>
         <div class="td-actions">
-          <button class="btn btn-success btn-sm" onclick="App.navigate('inbound');Sections.prefillInbound(${p.id})" title="Carica">+</button>
-          <button class="btn btn-danger btn-sm" onclick="App.navigate('outbound');Sections.prefillOutbound(${p.id})" title="Scarica">-</button>
+          <button class="btn btn-success btn-sm" onclick="Sections.quickIncrement(${p.id})" title="Carica">+</button>
+          <button class="btn btn-danger btn-sm" onclick="Sections.quickDecrement(${p.id})" title="Scarica">-</button>
         </div>
       </div>`;
     }).join('') : '<div class="empty-state" style="padding:20px"><div class="es-icon">✅</div><p>Tutti i prodotti sono sopra la scorta minima</p></div>'}</div>
@@ -103,15 +103,15 @@ const Sections = (() => {
     const el = document.getElementById('section-products');
     const prods = DB.Products.filter(prodFilters);
 
-    // Apply sorting
+    // Apply sorting (collapsing multiple spaces and ignoring for comparison)
     if (prodFilters.sortKey) {
       prods.sort((a, b) => {
         let valA = a[prodFilters.sortKey];
         let valB = b[prodFilters.sortKey];
         if (typeof valA === 'string') {
-          valA = valA.toLowerCase();
-          valB = (valB || '').toLowerCase();
-          return prodFilters.sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+          const cleanA = valA.toLowerCase().replace(/\s+/g, '');
+          const cleanB = (valB || '').toLowerCase().replace(/\s+/g, '');
+          return prodFilters.sortOrder === 'asc' ? cleanA.localeCompare(cleanB) : cleanB.localeCompare(cleanA);
         } else {
           valA = valA || 0;
           valB = valB || 0;
@@ -123,7 +123,20 @@ const Sections = (() => {
     const canEdit = DB.Users.canEdit(App.getUser());
     const canDel = DB.Users.canDelete(App.getUser());
 
-    const hasStructure = el.querySelector('.filters-bar') !== null;
+    const settings = DB.Settings.get();
+    const rowHeight = settings.rowHeight || 'normal';
+    const colWidthProduct = settings.colWidthProduct || 'wide';
+    const showColCode = settings.showColCode !== false;
+    const showColBrand = settings.showColBrand !== false;
+    const showColModel = settings.showColModel !== false;
+    const showColQty = settings.showColQty !== false;
+    const showColMin = settings.showColMin !== false;
+
+    const expectedCols = 3 + (showColCode?1:0) + (showColBrand?1:0) + (showColModel?1:0) + (showColQty?1:0) + (showColMin?1:0);
+    const table = el.querySelector('#products-table');
+    const actualCols = table ? table.querySelectorAll('thead th').length : 0;
+    const hasStructure = el.querySelector('.filters-bar') !== null && actualCols === expectedCols;
+
     if (!hasStructure) {
       el.innerHTML = `
 <div class="page-header">
@@ -139,21 +152,21 @@ const Sections = (() => {
 <div class="filters-bar">
   <input type="text" id="prod-filter-q" placeholder="🔍 Cerca per nome, codice, barcode, marca o modello..." value="${prodFilters.q}"
     oninput="Sections.setProdFilter('q',this.value)" style="flex:1;min-width:200px"/>
-  <button id="prod-filter-lowStock-btn" class="btn ${prodFilters.lowStock ? 'btn-warning' : 'btn-ghost'} btn-sm" onclick="Sections.toggleLowStockFilter()">⚠️ Sotto Scorta</button>
+  <button class="btn btn-ghost btn-sm" onclick="Sections.openTableCustomization()">⚙️ Personalizza</button>
   <button class="btn btn-ghost btn-sm" onclick="Sections.resetProdFilters()">Reset</button>
 </div>
 <div class="table-wrap">
-<table id="products-table">
+<table id="products-table" class="custom-table row-${rowHeight} col-prod-${colWidthProduct}">
 <thead>
   <tr>
     <th style="width:40px;text-align:center"><input type="checkbox" id="prod-select-all" onclick="Sections.toggleAllProducts(this)"></th>
-    <th style="cursor:pointer" onclick="Sections.toggleProdSort('code')">Codice ${getSortArrow('code')}</th>
-    <th style="cursor:pointer" onclick="Sections.toggleProdSort('name')">Prodotto ${getSortArrow('name')}</th>
-    <th style="cursor:pointer" onclick="Sections.toggleProdSort('brand')">Marca ${getSortArrow('brand')}</th>
-    <th style="cursor:pointer" onclick="Sections.toggleProdSort('model')">Modello ${getSortArrow('model')}</th>
-    <th style="cursor:pointer" onclick="Sections.toggleProdSort('qty')">Giacenza ${getSortArrow('qty')}</th>
-    <th style="cursor:pointer" onclick="Sections.toggleProdSort('qtyMin')">Scorta min. ${getSortArrow('qtyMin')}</th>
-    <th>Azioni</th>
+    ${showColCode ? `<th style="cursor:pointer; width: 110px;" onclick="Sections.toggleProdSort('code')">Codice ${getSortArrow('code')}</th>` : ''}
+    <th style="cursor:pointer; ${colWidthProduct === 'wide' ? 'width: 35%;' : colWidthProduct === 'extra-wide' ? 'width: 45%;' : 'width: 25%;'}" onclick="Sections.toggleProdSort('name')">Prodotto ${getSortArrow('name')}</th>
+    ${showColBrand ? `<th style="cursor:pointer; width: 12%;" onclick="Sections.toggleProdSort('brand')">Marca ${getSortArrow('brand')}</th>` : ''}
+    ${showColModel ? `<th style="cursor:pointer; width: 8%;" onclick="Sections.toggleProdSort('model')">Modello ${getSortArrow('model')}</th>` : ''}
+    ${showColQty ? `<th style="cursor:pointer; width: 10%;" onclick="Sections.toggleProdSort('qty')">Giacenza ${getSortArrow('qty')}</th>` : ''}
+    ${showColMin ? `<th style="cursor:pointer; width: 8%;" onclick="Sections.toggleProdSort('qtyMin')">Scorta min. ${getSortArrow('qtyMin')}</th>` : ''}
+    <th style="width: 100px;">Azioni</th>
   </tr>
 </thead>
 <tbody id="products-tbody"></tbody>
@@ -161,14 +174,13 @@ const Sections = (() => {
 </div>`;
     } else {
       const headers = el.querySelectorAll('thead th');
-      if (headers.length >= 7) {
-        headers[1].innerHTML = `Codice ${getSortArrow('code')}`;
-        headers[2].innerHTML = `Prodotto ${getSortArrow('name')}`;
-        headers[3].innerHTML = `Marca ${getSortArrow('brand')}`;
-        headers[4].innerHTML = `Modello ${getSortArrow('model')}`;
-        headers[5].innerHTML = `Giacenza ${getSortArrow('qty')}`;
-        headers[6].innerHTML = `Scorta min. ${getSortArrow('qtyMin')}`;
-      }
+      let hIdx = 1;
+      if (showColCode && headers[hIdx]) headers[hIdx++].innerHTML = `Codice ${getSortArrow('code')}`;
+      if (headers[hIdx]) headers[hIdx++].innerHTML = `Prodotto ${getSortArrow('name')}`;
+      if (showColBrand && headers[hIdx]) headers[hIdx++].innerHTML = `Marca ${getSortArrow('brand')}`;
+      if (showColModel && headers[hIdx]) headers[hIdx++].innerHTML = `Modello ${getSortArrow('model')}`;
+      if (showColQty && headers[hIdx]) headers[hIdx++].innerHTML = `Giacenza ${getSortArrow('qty')}`;
+      if (showColMin && headers[hIdx]) headers[hIdx++].innerHTML = `Scorta min. ${getSortArrow('qtyMin')}`;
     }
 
     const tbody = document.getElementById('products-tbody');
@@ -182,24 +194,23 @@ const Sections = (() => {
         const badge = p.qty === 0 ? 'badge-red' : p.qty <= p.qtyMin ? 'badge-yellow' : 'badge-green';
         return `<tr>
           <td style="text-align:center"><input type="checkbox" class="prod-checkbox" value="${p.id}" onclick="Sections.updateDeleteSelectedButton()"></td>
-          <td><div class="td-code">${p.code}</div>${p.barcode?`<div class="td-code" style="font-size:.7rem;color:var(--text3)">${p.barcode}</div>`:''}</td>
-          <td style="font-weight:600;max-width:240px">${App.escape(p.name)}</td>
-          <td>${App.escape(p.brand||'—')}</td>
-          <td>${App.escape(p.model||'—')}</td>
-          <td>
+          ${showColCode ? `<td><div class="td-code">${p.code}</div>${p.barcode?`<div class="td-code" style="font-size:.7rem;color:var(--text3)">${p.barcode}</div>`:''}</td>` : ''}
+          <td style="font-weight:600;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
+          ${showColBrand ? `<td>${App.escape(p.brand||'—')}</td>` : ''}
+          ${showColModel ? `<td>${App.escape(p.model||'—')}</td>` : ''}
+          ${showColQty ? `<td>
             <span class="badge ${badge}">${p.qty}</span>
             <div class="stock-bar" style="margin-top:4px;min-width:60px"><div class="stock-bar-track"><div class="stock-bar-fill ${stockClass}" style="width:${stockPct}%"></div></div></div>
-          </td>
-          <td>${p.qtyMin}</td>
+          </td>` : ''}
+          ${showColMin ? `<td>${p.qtyMin}</td>` : ''}
           <td><div class="td-actions">
-            ${canEdit?`<button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.editProduct(${p.id})" title="Modifica">✏️</button>
-            <button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.duplicateProduct(${p.id})" title="Duplica">📋</button>`:'' }
+            ${canEdit?`<button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.editProduct(${p.id})" title="Modifica">✏️</button>`:'' }
             ${canDel?`<button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.deleteProduct(${p.id})" title="Elimina">🗑️</button>`:''}
-            <button class="btn btn-success btn-sm" onclick="App.navigate('inbound');Sections.prefillInbound(${p.id})">+</button>
-            <button class="btn btn-danger" onclick="App.navigate('outbound');Sections.prefillOutbound(${p.id})">-</button>
+            <button class="btn btn-success btn-sm" onclick="Sections.quickIncrement(${p.id})">+</button>
+            <button class="btn btn-danger btn-sm" onclick="Sections.quickDecrement(${p.id})">-</button>
           </div></td>
         </tr>`;
-      }).join('') : '<tr><td colspan="8"><div class="empty-state"><div class="es-icon">📦</div><h3>Nessun prodotto trovato</h3><p>Prova a modificare i filtri o aggiungine uno nuovo</p></div></td></tr>';
+      }).join('') : `<tr><td colspan="${expectedCols}"><div class="empty-state"><div class="es-icon">📦</div><h3>Nessun prodotto trovato</h3><p>Prova a modificare i filtri o aggiungine uno nuovo</p></div></td></tr>`;
     }
   }
 
@@ -342,6 +353,189 @@ const Sections = (() => {
   function duplicateProduct(id) {
     const p = DB.Products.duplicate(id);
     App.toast(`Prodotto "${p.name}" duplicato`,'info');
+    const el = document.getElementById('section-products');
+    if (el) el.innerHTML = '';
+    renderProducts();
+  }
+
+  function quickIncrement(productId) {
+    const p = DB.Products.find(productId);
+    if (!p) { App.toast('Prodotto non trovato', 'error'); return; }
+    const qty = 1;
+    DB.Products.updateQty(productId, qty);
+    DB.Movements.create({
+      type: 'in',
+      productId: p.id,
+      productCode: p.code,
+      productName: p.name,
+      qty: qty,
+      brand: p.brand || '',
+      model: p.model || '',
+      operator: App.getUser()?.name || 'admin',
+      notes: 'Carico rapido'
+    });
+    App.toast(`Caricato ${qty}x ${p.name}`, 'success');
+    App.updateNotifications();
+    const activeSection = document.querySelector('.nav-item.active')?.dataset?.section;
+    if (activeSection === 'products') {
+      renderProducts();
+    } else if (activeSection === 'dashboard') {
+      renderDashboard();
+    } else if (activeSection === 'movements') {
+      Sections.renderMovements();
+    } else if (activeSection === 'inbound') {
+      Sections.renderInbound();
+    } else if (activeSection === 'outbound') {
+      Sections.renderOutbound();
+    } else if (activeSection === 'reports') {
+      Sections.renderReports();
+    }
+  }
+
+  function quickDecrement(productId) {
+    const p = DB.Products.find(productId);
+    if (!p) { App.toast('Prodotto non trovato', 'error'); return; }
+    if ((p.qty || 0) < 1) {
+      App.toast('Quantità insufficiente per lo scarico', 'error');
+      return;
+    }
+    const qty = 1;
+    DB.Products.updateQty(productId, -qty);
+    DB.Movements.create({
+      type: 'out',
+      productId: p.id,
+      productCode: p.code,
+      productName: p.name,
+      qty: qty,
+      brand: p.brand || '',
+      model: p.model || '',
+      operator: App.getUser()?.name || 'admin',
+      notes: 'Scarico rapido'
+    });
+    App.toast(`Scaricato ${qty}x ${p.name}`, 'success');
+    App.updateNotifications();
+    const activeSection = document.querySelector('.nav-item.active')?.dataset?.section;
+    if (activeSection === 'products') {
+      renderProducts();
+    } else if (activeSection === 'dashboard') {
+      renderDashboard();
+    } else if (activeSection === 'movements') {
+      Sections.renderMovements();
+    } else if (activeSection === 'inbound') {
+      Sections.renderInbound();
+    } else if (activeSection === 'outbound') {
+      Sections.renderOutbound();
+    } else if (activeSection === 'reports') {
+      Sections.renderReports();
+    }
+  }
+
+  function showProductActions(productId) {
+    const p = DB.Products.find(productId);
+    if (!p) {
+      App.toast('Prodotto non trovato o eliminato', 'warning');
+      return;
+    }
+    const canEdit = DB.Users.canEdit(App.getUser());
+    const canDel = DB.Users.canDelete(App.getUser());
+    
+    const bodyHTML = `
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:3rem;margin-bottom:12px">📦</div>
+        <h3 style="margin-bottom:6px;font-size:1.2rem;font-weight:700">${App.escape(p.name)}</h3>
+        <p style="color:var(--text2);font-size:.85rem;margin-bottom:12px">Codice: ${p.code} | Barcode: ${p.barcode || '—'}</p>
+        <p style="font-size:1.1rem;font-weight:700;margin-bottom:16px">Giacenza: <span class="badge ${p.qty===0?'badge-red':p.qty<=p.qtyMin?'badge-yellow':'badge-green'}">${p.qty} pz</span></p>
+        <div style="display:flex;flex-direction:column;gap:8px;max-width:260px;margin:0 auto">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success" style="flex:1;justify-content:center" onclick="App.closeModal();Sections.quickIncrement(${p.id})">➕ Carica</button>
+            <button class="btn btn-danger" style="flex:1;justify-content:center" onclick="App.closeModal();Sections.quickDecrement(${p.id})">➖ Scarica</button>
+          </div>
+          ${canEdit ? `<button class="btn btn-primary" style="justify-content:center" onclick="App.closeModal();App.navigate('products');Sections.editProduct(${p.id})">✏️ Modifica</button>` : ''}
+          ${canDel ? `<button class="btn btn-ghost" style="justify-content:center;color:var(--red)" onclick="App.closeModal();App.navigate('products');Sections.deleteProduct(${p.id})">🗑️ Elimina</button>` : ''}
+        </div>
+      </div>
+    `;
+    App.openModal('Azioni Prodotto', bodyHTML, `<button class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>`);
+  }
+
+  function openTableCustomization() {
+    const settings = DB.Settings.get();
+    const rowHeight = settings.rowHeight || 'normal';
+    const colWidthProduct = settings.colWidthProduct || 'wide';
+    const showColCode = settings.showColCode !== false;
+    const showColBrand = settings.showColBrand !== false;
+    const showColModel = settings.showColModel !== false;
+    const showColQty = settings.showColQty !== false;
+    const showColMin = settings.showColMin !== false;
+
+    const bodyHTML = `
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="form-group">
+          <label>Spaziatura Righe</label>
+          <select id="cust-row-height" class="form-control" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+            <option value="compact" ${rowHeight === 'compact' ? 'selected' : ''}>Compatta (Righe strette)</option>
+            <option value="normal" ${rowHeight === 'normal' ? 'selected' : ''}>Normale (Standard)</option>
+            <option value="cozy" ${rowHeight === 'cozy' ? 'selected' : ''}>Spaziosa (Righe alte)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Larghezza Sezione Prodotto</label>
+          <select id="cust-col-width" class="form-control" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+            <option value="normal" ${colWidthProduct === 'normal' ? 'selected' : ''}>Stretta</option>
+            <option value="wide" ${colWidthProduct === 'wide' ? 'selected' : ''}>Media (Consigliata)</option>
+            <option value="extra-wide" ${colWidthProduct === 'extra-wide' ? 'selected' : ''}>Larga</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Mostra / Nascondi Colonne</label>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="cust-col-code" ${showColCode ? 'checked' : ''} /> Codice / Barcode
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="cust-col-brand" ${showColBrand ? 'checked' : ''} /> Marca
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="cust-col-model" ${showColModel ? 'checked' : ''} /> Modello
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="cust-col-qty" ${showColQty ? 'checked' : ''} /> Giacenza
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="cust-col-min" ${showColMin ? 'checked' : ''} /> Scorta Minima
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+
+    App.openModal('Personalizza Tabella Prodotti', bodyHTML, `
+      <button class="btn btn-ghost" onclick="App.closeModal()">Annulla</button>
+      <button class="btn btn-primary" onclick="Sections.saveTableCustomization()">💾 Applica</button>
+    `);
+  }
+
+  function saveTableCustomization() {
+    const rowHeight = document.getElementById('cust-row-height').value;
+    const colWidthProduct = document.getElementById('cust-col-width').value;
+    const showColCode = document.getElementById('cust-col-code').checked;
+    const showColBrand = document.getElementById('cust-col-brand').checked;
+    const showColModel = document.getElementById('cust-col-model').checked;
+    const showColQty = document.getElementById('cust-col-qty').checked;
+    const showColMin = document.getElementById('cust-col-min').checked;
+
+    DB.Settings.set({
+      rowHeight,
+      colWidthProduct,
+      showColCode,
+      showColBrand,
+      showColModel,
+      showColQty,
+      showColMin
+    });
+
+    App.toast('Tabella personalizzata', 'success');
+    App.closeModal();
     const el = document.getElementById('section-products');
     if (el) el.innerHTML = '';
     renderProducts();
@@ -496,6 +690,7 @@ const Sections = (() => {
     openProductForm, editProduct, saveProduct, duplicateProduct, deleteProduct, exportProducts,
     toggleProdSort, getSortArrow, toggleAllProducts, updateDeleteSelectedButton, deleteSelectedProducts,
     openMassEditForm, saveMassEdit,
+    quickIncrement, quickDecrement, showProductActions, openTableCustomization, saveTableCustomization,
     prefillInbound: () => {},
     prefillOutbound: (productId) => {
       const p = DB.Products.find(productId);

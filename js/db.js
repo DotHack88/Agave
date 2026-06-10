@@ -30,59 +30,78 @@ const DB = (() => {
   function today() { return new Date().toISOString().slice(0, 10); }
 
   // ── SERVER SYNC ──
-  // Tutte le chiamate ora passano per pushToServer() che sincronizza interamente il DB in Firebase
+  // Firebase sync è DISABILITATO su localhost — i dati restano in localStorage.
+  // Il sync Firebase avviene SOLO in produzione (Vercel / deploy remoto).
 
-  // ── SYNC: Il server (data.json) è la UNICA fonte di verità ──
-  // All'avvio: SEMPRE scarica dal server.
-  // Dopo ogni mutazione: SEMPRE invia tutto al server.
+  const _isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+
   let _syncInProgress = false;
   let _syncPending = false;
 
+  // Caricamento iniziale da server locale (localhost) o Firebase (produzione)
   async function pullFromServer() {
+    // ── LOCALHOST: carica da /api/initialize (Express locale) ──
+    if (_isLocalhost) {
+      try {
+        const res = await fetch('/api/initialize');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const serverData = await res.json();
+        if (serverData.products && serverData.products.length > 0) {
+          save(KEYS.products,  serverData.products);
+          save(KEYS.movements, serverData.movements || []);
+          if (serverData.users     && serverData.users.length > 0)         save(KEYS.users, serverData.users);
+          if (serverData.settings  && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
+          if (serverData.counters) save(KEYS.counters, serverData.counters);
+          console.log('[AgaveWMS] ✅ [LOCALE] Dati caricati da /api/initialize (' + serverData.products.length + ' prodotti).');
+        } else {
+          console.log('[AgaveWMS] ℹ️ [LOCALE] Nessun dato su /api/initialize, uso localStorage.');
+        }
+      } catch(e) {
+        console.warn('[AgaveWMS] ⚠️ [LOCALE] /api/initialize non disponibile, uso localStorage:', e.message);
+      }
+      return true;
+    }
+
+    // ── PRODUZIONE: carica da Firebase ──
     try {
       const res = await fetch(FIREBASE_URL + '/data.json');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const serverData = (await res.json()) || {};
-      const serverProducts = serverData.products || [];
-      const localProducts  = load(KEYS.products) || [];
+      const localProducts = load(KEYS.products) || [];
 
-      // Se il server non è MAI stato inizializzato (è vergine) e il locale ha dati → push iniziale (migrazione)
+      // Se il server Firebase è vergine e il locale ha dati → migrazione iniziale
       if (!serverData.initialized && localProducts.length > 0) {
-        console.log('[AgaveWMS] 📤 Server vuoto (nuovo), invio ' + localProducts.length + ' prodotti...');
+        console.log('[AgaveWMS] 📤 Firebase vuoto, invio ' + localProducts.length + ' prodotti...');
         await pushToServer();
         return true;
       }
 
-      // Altrimenti il server è la fonte di verità → scarica SEMPRE (anche se vuoto, per rispettare le eliminazioni)
-      save(KEYS.products, serverData.products || []);
+      // Firebase è la fonte di verità in produzione
+      save(KEYS.products,  serverData.products  || []);
       save(KEYS.movements, serverData.movements || []);
-      if (serverData.users && serverData.users.length > 0) save(KEYS.users, serverData.users);
-      if (serverData.settings && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
+      if (serverData.users     && serverData.users.length > 0)         save(KEYS.users, serverData.users);
+      if (serverData.settings  && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
       if (serverData.counters) save(KEYS.counters, serverData.counters);
-      
-      console.log('[AgaveWMS] ✅ Dati scaricati dal server (' + (serverData.products || []).length + ' prodotti).');
+      console.log('[AgaveWMS] ✅ [FIREBASE] Dati scaricati (' + (serverData.products || []).length + ' prodotti).');
       return true;
     } catch (e) {
-      console.warn('[AgaveWMS] ⚠️ Sync server non disponibile, uso localStorage:', e.message);
+      console.warn('[AgaveWMS] ⚠️ Firebase non disponibile, uso localStorage:', e.message);
       return false;
     }
   }
 
-  // Invia TUTTO lo stato locale al server (dopo ogni mutazione)
+  // Push al server — solo in produzione (Firebase)
   async function pushToServer() {
-    if (_syncInProgress) {
-      _syncPending = true;
-      return;
-    }
+    if (_isLocalhost) return; // ← su localhost non toccare Firebase
+    if (_syncInProgress) { _syncPending = true; return; }
     _syncInProgress = true;
     _syncPending = false;
     try {
-      // Usiamo PUT per sovrascrivere interamente il nodo /data in Firebase
       await fetch(FIREBASE_URL + '/data.json', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          initialized: true, // Questo flag indica che il server non è più vergine
+          initialized: true,
           products:  load(KEYS.products)  || [],
           movements: load(KEYS.movements) || [],
           users:     load(KEYS.users)     || [],
@@ -91,30 +110,26 @@ const DB = (() => {
         })
       });
     } catch (e) {
-      console.warn('[AgaveWMS] Push al server fallito:', e.message);
+      console.warn('[AgaveWMS] Push Firebase fallito:', e.message);
     } finally {
       _syncInProgress = false;
-      if (_syncPending) {
-        pushToServer();
-      }
+      if (_syncPending) pushToServer();
     }
   }
 
-  // Polling: scarica dal server ogni 30 secondi per rimanere allineati
+  // Polling ogni 30s — solo in produzione (Firebase)
   setInterval(async () => {
+    if (_isLocalhost) return; // ← su localhost nessun polling Firebase
     if (_syncInProgress) return;
     try {
       const res = await fetch(FIREBASE_URL + '/data.json');
       if (!res.ok) return;
       const serverData = (await res.json()) || {};
-      
-      // Quando fa il polling, accetta anche liste vuote (se un altro utente ha cancellato tutto)
       if (serverData.initialized) {
-        save(KEYS.products, serverData.products || []);
+        save(KEYS.products,  serverData.products  || []);
         save(KEYS.movements, serverData.movements || []);
         if (serverData.counters) save(KEYS.counters, serverData.counters);
       }
-      // Rinfresca la UI se l'utente è loggato
       if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
         const section = document.querySelector('.nav-item.active')?.dataset?.section;
         if (section && typeof Sections !== 'undefined') {
@@ -192,21 +207,36 @@ const DB = (() => {
     find(id) { return this.all().find(p => p.id === id); },
     findByCode(code) { return this.all().find(p => p.code === code || p.barcode === code); },
     search(q) {
-      const s = q.toLowerCase();
+      if (!q) return [];
+      const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return [];
       return this.active().filter(p =>
-        (p.name || '').toLowerCase().includes(s) ||
-        (p.code || '').toLowerCase().includes(s) ||
-        (p.barcode || '').includes(s) ||
-        (p.category || '').toLowerCase().includes(s) ||
-        (p.brand || '').toLowerCase().includes(s) ||
-        (p.model || '').toLowerCase().includes(s) ||
-        (p.supplier || '').toLowerCase().includes(s)
+        tokens.every(token =>
+          (p.name || '').toLowerCase().includes(token) ||
+          (p.code || '').toLowerCase().includes(token) ||
+          (p.barcode || '').toLowerCase().includes(token) ||
+          (p.category || '').toLowerCase().includes(token) ||
+          (p.brand || '').toLowerCase().includes(token) ||
+          (p.model || '').toLowerCase().includes(token) ||
+          (p.supplier || '').toLowerCase().includes(token) ||
+          (p.description || '').toLowerCase().includes(token) ||
+          (p.notes || '').toLowerCase().includes(token)
+        )
       );
     },
     create(data) {
       const id = nextId('PRD');
       const protocol = nextId('PROT'); // Sequential protocol number
-      const p = { id, protocol, code: data.code || genCode('PRD'), active: true, created: now(), qty: 0, ...data };
+      const { id: _, protocol: __, created: ___, ...rest } = data;
+      const p = {
+        code: rest.code || genCode('PRD'),
+        active: true,
+        qty: 0,
+        ...rest,
+        id,
+        protocol,
+        created: now()
+      };
       const all = this.all(); all.push(p); save(KEYS.products, all);
       return p;
     },
@@ -253,16 +283,22 @@ const DB = (() => {
     filter(opts = {}) {
       let arr = this.active();
       if (opts.q) {
-        const s = opts.q.toLowerCase();
-        arr = arr.filter(p =>
-          (p.name || '').toLowerCase().includes(s) ||
-          (p.code || '').toLowerCase().includes(s) ||
-          (p.barcode || '').includes(s) ||
-          (p.brand || '').toLowerCase().includes(s) ||
-          (p.model || '').toLowerCase().includes(s) ||
-          (p.category || '').toLowerCase().includes(s) ||
-          (p.supplier || '').toLowerCase().includes(s)
-        );
+        const tokens = opts.q.toLowerCase().split(/\s+/).filter(Boolean);
+        if (tokens.length > 0) {
+          arr = arr.filter(p =>
+            tokens.every(token =>
+              (p.name || '').toLowerCase().includes(token) ||
+              (p.code || '').toLowerCase().includes(token) ||
+              (p.barcode || '').toLowerCase().includes(token) ||
+              (p.brand || '').toLowerCase().includes(token) ||
+              (p.model || '').toLowerCase().includes(token) ||
+              (p.category || '').toLowerCase().includes(token) ||
+              (p.supplier || '').toLowerCase().includes(token) ||
+              (p.description || '').toLowerCase().includes(token) ||
+              (p.notes || '').toLowerCase().includes(token)
+            )
+          );
+        }
       }
       if (opts.category) arr = arr.filter(p => p.category === opts.category);
       if (opts.brand) arr = arr.filter(p => p.brand === opts.brand);
@@ -302,7 +338,22 @@ const DB = (() => {
       if (opts.productId) arr = arr.filter(m => m.productId === opts.productId);
       if (opts.from) arr = arr.filter(m => m.date >= opts.from);
       if (opts.to) arr = arr.filter(m => m.date <= opts.to);
-      if (opts.q) { const s = opts.q.toLowerCase(); arr = arr.filter(m => m.productName?.toLowerCase().includes(s) || m.productCode?.toLowerCase().includes(s) || m.brand?.toLowerCase().includes(s) || m.model?.toLowerCase().includes(s) || m.document?.toLowerCase().includes(s) || m.customer?.toLowerCase().includes(s) || m.supplier?.toLowerCase().includes(s)); }
+      if (opts.q) {
+        const tokens = opts.q.toLowerCase().split(/\s+/).filter(Boolean);
+        if (tokens.length > 0) {
+          arr = arr.filter(m =>
+            tokens.every(token =>
+              (m.productName || '').toLowerCase().includes(token) ||
+              (m.productCode || '').toLowerCase().includes(token) ||
+              (m.brand || '').toLowerCase().includes(token) ||
+              (m.model || '').toLowerCase().includes(token) ||
+              (m.document || '').toLowerCase().includes(token) ||
+              (m.customer || '').toLowerCase().includes(token) ||
+              (m.supplier || '').toLowerCase().includes(token)
+            )
+          );
+        }
+      }
       return arr;
     },
     byProduct() {
@@ -502,8 +553,9 @@ const DB = (() => {
       save(KEYS.movements, allMovements);
       save(KEYS.counters,  counters);
 
-      // ✅ Push UNICO al server Firebase (una sola richiesta HTTP)
-      pushToServer();
+      // ✅ Push: Firebase in produzione, data.json su localhost
+      pushToServer();       // → Firebase (no-op su localhost)
+      pushToLocalServer();  // → data.json (no-op in produzione)
 
       return results;
     },
@@ -764,25 +816,50 @@ const DB = (() => {
     }
   };
 
+  // Persiste le modifiche su data.json via il server Express locale (solo localhost)
+  let _localPushDebounce = null;
+  function pushToLocalServer() {
+    if (!_isLocalhost) return;
+    clearTimeout(_localPushDebounce);
+    _localPushDebounce = setTimeout(async () => {
+      try {
+        await fetch('/api/bulk-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            products:  load(KEYS.products)  || [],
+            movements: load(KEYS.movements) || [],
+            users:     load(KEYS.users)     || [],
+            settings:  load(KEYS.settings)  || {},
+            counters:  load(KEYS.counters)  || {}
+          })
+        });
+      } catch(e) {
+        console.warn('[AgaveWMS] ⚠️ [LOCALE] Salvataggio su data.json fallito:', e.message);
+      }
+    }, 300); // debounce 300ms — evita scritture multiple in rapida successione
+  }
+
   // Helper to trigger backup + server push after mutation
   function mutate(fn) {
     return function (...args) {
       const res = fn.apply(this, args);
       Backup.autoBackup();
-      pushToServer(); // 🔄 Sync immediato al server dopo ogni modifica
+      pushToServer();        // → Firebase (solo in produzione, no-op su localhost)
+      pushToLocalServer();   // → data.json (solo su localhost, no-op in produzione)
       return res;
     };
   }
 
   // Wrap mutations
-  Products.create = mutate(Products.create);
-  Products.update = mutate(Products.update);
-  Products.delete = mutate(Products.delete);
+  Products.create    = mutate(Products.create);
+  Products.update    = mutate(Products.update);
+  Products.delete    = mutate(Products.delete);
   Products.updateQty = mutate(Products.updateQty);
-  Movements.create = mutate(Movements.create);
-  Users.create = mutate(Users.create);
-  Users.update = mutate(Users.update);
-  Users.delete = mutate(Users.delete);
+  Movements.create   = mutate(Movements.create);
+  Users.create       = mutate(Users.create);
+  Users.update       = mutate(Users.update);
+  Users.delete       = mutate(Users.delete);
 
   init();
   Backup.dailyBackup();
