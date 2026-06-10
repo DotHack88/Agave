@@ -166,7 +166,7 @@ Object.assign(Sections, {
             <thead><tr><th>#</th><th>Prodotto</th><th>Entrate</th><th>Uscite</th><th>Totale</th></tr></thead>
             <tbody>${topMoved.map((p,i)=>`<tr>
               <td><span class="badge badge-primary">${i+1}</span></td>
-              <td style="font-weight:600;font-size:.87rem;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
+              <td class="product-link" style="font-weight:600;font-size:.87rem" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
               <td><span class="badge badge-green">+${p.in}</span></td>
               <td><span class="badge badge-red">-${p.out}</span></td>
               <td><b>${p.in+p.out}</b></td>
@@ -179,7 +179,7 @@ Object.assign(Sections, {
           ${low.length ? `<div class="table-wrap"><table>
             <thead><tr><th>Prodotto</th><th>Disponibile</th><th>Minimo</th><th>Stato</th></tr></thead>
             <tbody>${low.map(p=>`<tr>
-              <td style="font-weight:600;font-size:.87rem;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
+              <td class="product-link" style="font-weight:600;font-size:.87rem" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
               <td><span class="badge ${p.qty===0?'badge-red':'badge-yellow'}">${p.qty}</span></td>
               <td>${p.qtyMin}</td>
               <td><span class="badge ${p.qty===0?'badge-red':'badge-yellow'}">${p.qty===0?'ESAURITO':'Bassa'}</span></td>

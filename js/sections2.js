@@ -179,7 +179,7 @@ Object.assign(Sections, {
           ${inboundCart.map(item => `
             <tr>
               <td><div class="td-code">${item.product.code}</div><div class="td-code" style="font-size:.7rem;color:var(--text3)">${item.product.barcode || ''}</div></td>
-              <td style="font-weight:600;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
+              <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
               <td>${App.escape(item.product.brand || '—')}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:4px">
@@ -215,7 +215,7 @@ Object.assign(Sections, {
       <thead><tr><th>Data</th><th>Prodotto</th><th>Qty</th><th>Marca</th></tr></thead>
       <tbody>${DB.Movements.filter({type:'in'}).slice(0,10).map(m=>`<tr>
         <td style="font-size:.8rem">${App.fmtDate(m.date)}</td>
-        <td><div style="font-weight:600;font-size:.85rem;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div></td>
+        <td><div class="product-link" style="font-weight:600;font-size:.85rem" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div></td>
         <td><span class="badge badge-green">+${m.qty}</span></td>
         <td style="font-size:.82rem">${App.escape(m.brand || '—')}</td>
       </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Nessuna entrata</p></div></td></tr>'}
@@ -321,7 +321,7 @@ Object.assign(Sections, {
           ${outboundCart.map(item => `
             <tr>
               <td><div class="td-code">${item.product.code}</div><div class="td-code" style="font-size:.7rem;color:var(--text3)">${item.product.barcode || ''}</div></td>
-              <td style="font-weight:600;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
+              <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
               <td>${App.escape(item.product.brand || '—')}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:4px">
@@ -358,7 +358,7 @@ Object.assign(Sections, {
       <thead><tr><th>Data</th><th>Prodotto</th><th>Qty</th><th>Destinatario</th></tr></thead>
       <tbody>${DB.Movements.filter({type:'out'}).slice(0,10).map(m=>`<tr>
         <td style="font-size:.8rem">${App.fmtDate(m.date)}</td>
-        <td><div style="font-weight:600;font-size:.85rem;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div></td>
+        <td><div class="product-link" style="font-weight:600;font-size:.85rem" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div></td>
         <td><span class="badge badge-red">-${m.qty}</span></td>
         <td style="font-size:.82rem">${App.escape(m.customer || '—')}</td>
       </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Nessuna uscita</p></div></td></tr>'}
@@ -571,7 +571,7 @@ Object.assign(Sections, {
       tbody.innerHTML = moves.length ? moves.map(m=>`<tr>
   <td><span class="badge ${m.type==='in'?'badge-green':'badge-red'}">${m.type==='in'?'📥 Entrata':'📤 Uscita'}</span></td>
   <td style="font-size:.82rem;white-space:nowrap">${App.fmtDate(m.date)}</td>
-  <td style="font-weight:600;font-size:.87rem;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</td>
+  <td class="product-link" style="font-weight:600;font-size:.87rem" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</td>
   <td class="td-code">${App.escape(m.productCode || '')}</td>
   <td>${App.escape(m.brand || '—')}</td>
   <td>${App.escape(m.model || '—')}</td>

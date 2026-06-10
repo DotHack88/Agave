@@ -43,7 +43,7 @@ const Sections = (() => {
       <div class="recent-item">
         <div class="ri-dot ${m.type}"></div>
         <div class="ri-info">
-          <div class="ri-name" style="cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div>
+          <div class="ri-name product-link" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div>
           <div class="ri-meta">${App.fmtDate(m.date)} • ${m.operator}</div>
         </div>
         <div class="ri-qty ${m.type}">${m.type==='in'?'+':'-'}${m.qty}</div>
@@ -64,7 +64,7 @@ const Sections = (() => {
       <div class="recent-item">
         <div class="ri-dot" style="background:var(${p.qty === 0 ? '--red' : '--yellow'})"></div>
         <div class="ri-info">
-          <div class="ri-name" style="cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</div>
+          <div class="ri-name product-link" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</div>
           <div class="ri-meta">${p.code || '—'} • Min: ${p.qtyMin}</div>
           <div class="stock-bar" style="margin-top:4px;max-width:120px">
             <div class="stock-bar-track"><div class="stock-bar-fill ${stockClass}" style="width:${stockPct}%"></div></div>
@@ -195,7 +195,7 @@ const Sections = (() => {
         return `<tr>
           <td style="text-align:center"><input type="checkbox" class="prod-checkbox" value="${p.id}" onclick="Sections.updateDeleteSelectedButton()"></td>
           ${showColCode ? `<td><div class="td-code">${p.code}</div>${p.barcode?`<div class="td-code" style="font-size:.7rem;color:var(--text3)">${p.barcode}</div>`:''}</td>` : ''}
-          <td style="font-weight:600;cursor:pointer;color:var(--primary)" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
+          <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${p.id})">${App.escape(p.name)}</td>
           ${showColBrand ? `<td>${App.escape(p.brand||'—')}</td>` : ''}
           ${showColModel ? `<td>${App.escape(p.model||'—')}</td>` : ''}
           ${showColQty ? `<td>
