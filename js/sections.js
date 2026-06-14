@@ -314,7 +314,6 @@ const Sections = (() => {
       if (delta === 0) delete data.qty;
       if (data.qtyMin === oldQtyMin) delete data.qtyMin;
       DB.Products.update(id, data);
-      const delta = (data.qty || 0) - oldQty;
       if (delta !== 0) {
         const updatedProd = DB.Products.find(id);
         DB.Movements.create({
