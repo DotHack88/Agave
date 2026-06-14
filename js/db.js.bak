@@ -97,99 +97,18 @@ const DB = (() => {
     _syncInProgress = true;
     _syncPending = false;
     try {
-      const txLog = load(PREFIX + 'tx_log') || [];
-      if (txLog.length === 0) {
-        _syncInProgress = false;
-        return;
-      }
-      
-      const res = await fetch(FIREBASE_URL + '/data.json');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const serverData = (await res.json()) || {};
-      
-      if (!serverData.initialized) {
-        await fetch(FIREBASE_URL + '/data.json', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            initialized: true,
-            products: load(KEYS.products) || [],
-            movements: load(KEYS.movements) || [],
-            users: load(KEYS.users) || [],
-            settings: load(KEYS.settings) || {},
-            counters: load(KEYS.counters) || {}
-          })
-        });
-        save(PREFIX + 'tx_log', []);
-        _syncInProgress = false;
-        if (_syncPending) pushToServer();
-        return;
-      }
-      
-      serverData.products = serverData.products || [];
-      serverData.movements = serverData.movements || [];
-      serverData.users = serverData.users || [];
-      serverData.settings = serverData.settings || {};
-      serverData.counters = { ...(serverData.counters || {}), ...(load(KEYS.counters) || {}) };
-      
-      for (const tx of txLog) {
-         if (tx.entity === 'Products') {
-            if (tx.action === 'create') {
-               if (!serverData.products.find(p => p.id === tx.res.id)) serverData.products.push(tx.res);
-            } else if (tx.action === 'update') {
-               const p = serverData.products.find(x => x.id === tx.args[0]);
-               if (p) Object.assign(p, tx.args[1]);
-            } else if (tx.action === 'delete') {
-               serverData.products = serverData.products.filter(x => x.id !== tx.args[0]);
-            } else if (tx.action === 'updateQty') {
-               const p = serverData.products.find(x => x.id === tx.args[0]);
-               if (p) p.qty = Math.max(0, (p.qty || 0) + tx.args[1]);
-            }
-         } else if (tx.entity === 'Movements') {
-            if (tx.action === 'create') {
-               if (!serverData.movements.find(m => m.id === tx.res.id)) serverData.movements.unshift(tx.res);
-            }
-         } else if (tx.entity === 'Users') {
-            if (tx.action === 'create') {
-               if (!serverData.users.find(u => u.id === tx.res.id)) serverData.users.push(tx.res);
-            } else if (tx.action === 'update') {
-               const u = serverData.users.find(x => String(x.id) === String(tx.args[0]));
-               if (u) Object.assign(u, tx.args[1]);
-            } else if (tx.action === 'delete') {
-               serverData.users = serverData.users.filter(x => String(x.id) !== String(tx.args[0]));
-            }
-         } else if (tx.entity === 'Settings') {
-            if (tx.action === 'set') {
-               Object.assign(serverData.settings, tx.args[0]);
-            }
-         } else if (tx.entity === 'System') {
-            if (tx.action === 'bulk') {
-               serverData.products = tx.args[0].products;
-               serverData.movements = tx.args[0].movements;
-            }
-         }
-      }
-      
-      const putRes = await fetch(FIREBASE_URL + '/data.json', {
+      await fetch(FIREBASE_URL + '/data.json', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(serverData)
+        body: JSON.stringify({
+          initialized: true,
+          products:  load(KEYS.products)  || [],
+          movements: load(KEYS.movements) || [],
+          users:     load(KEYS.users)     || [],
+          settings:  load(KEYS.settings)  || {},
+          counters:  load(KEYS.counters)  || {}
+        })
       });
-      if (!putRes.ok) throw new Error('PUT HTTP ' + putRes.status);
-      
-      save(PREFIX + 'tx_log', []);
-      save(KEYS.products, serverData.products);
-      save(KEYS.movements, serverData.movements);
-      save(KEYS.users, serverData.users);
-      save(KEYS.settings, serverData.settings);
-      save(KEYS.counters, serverData.counters);
-      
-      if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
-        const section = document.querySelector('.nav-item.active')?.dataset?.section;
-        if (section && typeof Sections !== 'undefined') {
-          try { Sections.render(section); } catch(e) {}
-        }
-      }
     } catch (e) {
       console.warn('[AgaveWMS] Push Firebase fallito:', e.message);
     } finally {
@@ -202,13 +121,6 @@ const DB = (() => {
   setInterval(async () => {
     if (_isLocalhost) return; // ← su localhost nessun polling Firebase
     if (_syncInProgress) return;
-    
-    const txLog = load(PREFIX + 'tx_log') || [];
-    if (txLog.length > 0) {
-      pushToServer();
-      return;
-    }
-
     try {
       const res = await fetch(FIREBASE_URL + '/data.json');
       if (!res.ok) return;
@@ -642,9 +554,6 @@ const DB = (() => {
       save(KEYS.counters,  counters);
 
       // ✅ Push: Firebase in produzione, data.json su localhost
-      const tx = load(PREFIX + 'tx_log') || [];
-      tx.push({ entity: 'System', action: 'bulk', args: [{ products: allProducts, movements: allMovements }], ts: Date.now() });
-      save(PREFIX + 'tx_log', tx);
       pushToServer();       // → Firebase (no-op su localhost)
       pushToLocalServer();  // → data.json (no-op in produzione)
 
@@ -932,16 +841,9 @@ const DB = (() => {
   }
 
   // Helper to trigger backup + server push after mutation
-  function mutate(fn, entity, action) {
+  function mutate(fn) {
     return function (...args) {
       const res = fn.apply(this, args);
-      
-      if (entity && action && !_isLocalhost) {
-         const tx = load(PREFIX + 'tx_log') || [];
-         tx.push({ entity, action, args, res, ts: Date.now() });
-         save(PREFIX + 'tx_log', tx);
-      }
-      
       Backup.autoBackup();
       pushToServer();        // → Firebase (solo in produzione, no-op su localhost)
       pushToLocalServer();   // → data.json (solo su localhost, no-op in produzione)
@@ -950,15 +852,14 @@ const DB = (() => {
   }
 
   // Wrap mutations
-  Products.create    = mutate(Products.create, 'Products', 'create');
-  Products.update    = mutate(Products.update, 'Products', 'update');
-  Products.delete    = mutate(Products.delete, 'Products', 'delete');
-  Products.updateQty = mutate(Products.updateQty, 'Products', 'updateQty');
-  Movements.create   = mutate(Movements.create, 'Movements', 'create');
-  Users.create       = mutate(Users.create, 'Users', 'create');
-  Users.update       = mutate(Users.update, 'Users', 'update');
-  Users.delete       = mutate(Users.delete, 'Users', 'delete');
-  Settings.set       = mutate(Settings.set, 'Settings', 'set');
+  Products.create    = mutate(Products.create);
+  Products.update    = mutate(Products.update);
+  Products.delete    = mutate(Products.delete);
+  Products.updateQty = mutate(Products.updateQty);
+  Movements.create   = mutate(Movements.create);
+  Users.create       = mutate(Users.create);
+  Users.update       = mutate(Users.update);
+  Users.delete       = mutate(Users.delete);
 
   init();
   Backup.dailyBackup();

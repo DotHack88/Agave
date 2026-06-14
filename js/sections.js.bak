@@ -309,10 +309,6 @@ const Sections = (() => {
       // Editing existing product – check if qty changed to register movement
       const oldProd = DB.Products.find(id);
       const oldQty = oldProd ? (oldProd.qty || 0) : 0;
-      const oldQtyMin = oldProd ? (oldProd.qtyMin || 0) : 0;
-      const delta = (data.qty || 0) - oldQty;
-      if (delta === 0) delete data.qty;
-      if (data.qtyMin === oldQtyMin) delete data.qtyMin;
       DB.Products.update(id, data);
       const delta = (data.qty || 0) - oldQty;
       if (delta !== 0) {
