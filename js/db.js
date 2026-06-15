@@ -97,8 +97,8 @@ const DB = (() => {
     _syncInProgress = true;
     _syncPending = false;
     try {
-      const txLog = load(PREFIX + 'tx_log') || [];
-      if (txLog.length === 0) {
+      const txLogToProcess = load(PREFIX + 'tx_log') || [];
+      if (txLogToProcess.length === 0) {
         _syncInProgress = false;
         return;
       }
@@ -120,7 +120,9 @@ const DB = (() => {
             counters: load(KEYS.counters) || {}
           })
         });
-        save(PREFIX + 'tx_log', []);
+        const currentTxLog = load(PREFIX + 'tx_log') || [];
+        const remainingTxLog = currentTxLog.filter(tx => !txLogToProcess.some(p => p.ts === tx.ts));
+        save(PREFIX + 'tx_log', remainingTxLog);
         _syncInProgress = false;
         if (_syncPending) pushToServer();
         return;
@@ -132,7 +134,7 @@ const DB = (() => {
       serverData.settings = serverData.settings || {};
       serverData.counters = { ...(serverData.counters || {}), ...(load(KEYS.counters) || {}) };
       
-      for (const tx of txLog) {
+      for (const tx of txLogToProcess) {
          if (tx.entity === 'Products') {
             if (tx.action === 'create') {
                if (!serverData.products.find(p => p.id === tx.res.id)) serverData.products.push(tx.res);
@@ -177,9 +179,17 @@ const DB = (() => {
       });
       if (!putRes.ok) throw new Error('PUT HTTP ' + putRes.status);
       
-      save(PREFIX + 'tx_log', []);
-      save(KEYS.products, serverData.products);
-      save(KEYS.movements, serverData.movements);
+      const currentTxLog = load(PREFIX + 'tx_log') || [];
+      const remainingTxLog = currentTxLog.filter(tx => !txLogToProcess.some(p => p.ts === tx.ts));
+      save(PREFIX + 'tx_log', remainingTxLog);
+      
+      // Save to localStorage only if no pending transactions remain
+      if (remainingTxLog.length === 0) {
+        save(KEYS.products, serverData.products);
+        save(KEYS.movements, serverData.movements);
+      } else {
+        console.log('[AgaveWMS] Pushed changes, but pending local mutations exist; skipping overwrite.');
+      }
       save(KEYS.users, serverData.users);
       save(KEYS.settings, serverData.settings);
       save(KEYS.counters, serverData.counters);
@@ -931,62 +941,6 @@ const DB = (() => {
     }, 300); // debounce 300ms — evita scritture multiple in rapida successione
   }
 
-  // Push atomico di un batch completo — usato da saveCumulativeInbound/Outbound
-  // Bypassa il txLog per evitare race condition con operazioni multiple
-  async function pushBatch(products, movements, counters) {
-    if (_isLocalhost) {
-      // Su localhost: scrivi direttamente su data.json
-      try {
-        await fetch('/api/bulk-import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            products:  products,
-            movements: movements,
-            users:     load(KEYS.users)     || [],
-            settings:  load(KEYS.settings)  || {},
-            counters:  counters
-          })
-        });
-        console.log('[AgaveWMS] ✅ [LOCALE] Batch salvato su data.json');
-      } catch(e) {
-        console.warn('[AgaveWMS] ⚠️ [LOCALE] pushBatch fallito:', e.message);
-      }
-      return;
-    }
-    // In produzione: scrivi direttamente su Firebase con PUT completo
-    if (_syncInProgress) { _syncPending = true; return; }
-    _syncInProgress = true;
-    _syncPending = false;
-    try {
-      const serverData = {
-        initialized: true,
-        products:  products,
-        movements: movements,
-        users:     load(KEYS.users)     || [],
-        settings:  load(KEYS.settings)  || {},
-        counters:  counters
-      };
-      const putRes = await fetch(FIREBASE_URL + '/data.json', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(serverData)
-      });
-      if (!putRes.ok) throw new Error('PUT HTTP ' + putRes.status);
-      // Svuota txLog (le operazioni sono già in Firebase)
-      save(PREFIX + 'tx_log', []);
-      save(KEYS.counters, counters);
-      console.log('[AgaveWMS] ✅ [FIREBASE] Batch atomico salvato (' + movements.length + ' movimenti)');
-    } catch(e) {
-      console.warn('[AgaveWMS] ⚠️ pushBatch Firebase fallito:', e.message);
-      // Fallback: salva tramite txLog normale
-      pushToServer();
-    } finally {
-      _syncInProgress = false;
-      if (_syncPending) pushToServer();
-    }
-  }
-
   // Helper to trigger backup + server push after mutation
   function mutate(fn, entity, action) {
     return function (...args) {
@@ -1018,5 +972,5 @@ const DB = (() => {
 
   init();
   Backup.dailyBackup();
-  return { Products, Movements, Users, Settings, CSV, Backup, LocalBackup, pushBatch };
+  return { Products, Movements, Users, Settings, CSV, Backup, LocalBackup };
 })();

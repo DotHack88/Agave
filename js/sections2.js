@@ -265,23 +265,9 @@ Object.assign(Sections, {
     const dateVal = document.getElementById('ib-date').value;
     const operator = App.getUser()?.name || 'admin';
 
-    // ── Aggiorna localStorage in modo atomico (senza push singoli) ──
-    const products = DB.Products.all ? DB.Products.all() : [];
-    const movements = DB.Movements.all ? DB.Movements.all() : [];
-    const counters = JSON.parse(localStorage.getItem('agavewms_counters') || '{}');
-
-    const newMovements = [];
     inboundCart.forEach(item => {
-      // Incrementa qty del prodotto nell'array
-      const p = products.find(x => x.id === item.product.id);
-      if (p) p.qty = Math.max(0, (p.qty || 0) + item.qty);
-
-      // Crea il movimento
-      counters.MOV = (counters.MOV || 2000) + 1;
-      const mov = {
-        id: counters.MOV,
-        ts: new Date().toISOString(),
-        date: dateVal,
+      DB.Products.updateQty(item.product.id, item.qty);
+      DB.Movements.create({
         type: 'in',
         productId: item.product.id,
         productCode: item.product.code,
@@ -289,41 +275,18 @@ Object.assign(Sections, {
         qty: item.qty,
         brand: item.product.brand || '',
         model: item.product.model || '',
+        date: dateVal,
         operator: operator
-      };
-      movements.unshift(mov);
-      newMovements.push(mov);
-    });
-
-    // Salva tutto in localStorage in una volta sola
-    localStorage.setItem('agavewms_products', JSON.stringify(products));
-    localStorage.setItem('agavewms_movements', JSON.stringify(movements));
-    localStorage.setItem('agavewms_counters', JSON.stringify(counters));
-
-    // Push unico verso Firebase / data.json
-    DB.Backup.autoBackup();
-    if (typeof DB.pushBatch === 'function') {
-      DB.pushBatch(products, movements, counters);
-    } else {
-      // Fallback: aggiunge al tx_log e triggera pushToServer
-      const PREFIX = 'agavewms_';
-      const txArr = JSON.parse(localStorage.getItem(PREFIX + 'tx_log') || '[]');
-      inboundCart.forEach((item, i) => {
-        txArr.push({ entity: 'Products', action: 'updateQty', args: [item.product.id, item.qty], ts: Date.now() + i });
-        txArr.push({ entity: 'Movements', action: 'create', res: newMovements[i], args: [newMovements[i]], ts: Date.now() + i + 0.5 });
       });
-      localStorage.setItem(PREFIX + 'tx_log', JSON.stringify(txArr));
-    }
+    });
 
     const totalQty = inboundCart.reduce((s,i)=>s+i.qty, 0);
     App.toast(`Carico di ${totalQty} pezzi registrato con successo`, 'success');
-    console.log('[AgaveWMS] saveCumulativeInbound: movimenti totali dopo save:', movements.length);
+    console.log('[AgaveWMS] saveCumulativeInbound: movimenti totali dopo save:', DB.Movements.all().length);
     inboundCart = [];
-    // Reset filtri movimenti per mostrare sempre i nuovi movimenti
     if (window._movFilt) { window._movFilt.from = ''; window._movFilt.to = ''; window._movFilt.type = 'in'; window._movFilt.q = ''; }
     App.updateNotifications();
     this.renderInbound();
-    // Aggiorna anche la lista movimenti se visibile
     if (document.getElementById('section-movements')) this.renderMovements();
   },
 
@@ -464,23 +427,9 @@ Object.assign(Sections, {
     const customerVal = document.getElementById('ob-customer').value;
     const operator = App.getUser()?.name || 'admin';
 
-    // ── Aggiorna localStorage in modo atomico (senza push singoli) ──
-    const products = DB.Products.all ? DB.Products.all() : [];
-    const movements = DB.Movements.all ? DB.Movements.all() : [];
-    const counters = JSON.parse(localStorage.getItem('agavewms_counters') || '{}');
-
-    const newMovements = [];
     outboundCart.forEach(item => {
-      // Decrementa qty del prodotto
-      const p = products.find(x => x.id === item.product.id);
-      if (p) p.qty = Math.max(0, (p.qty || 0) - item.qty);
-
-      // Crea il movimento
-      counters.MOV = (counters.MOV || 2000) + 1;
-      const mov = {
-        id: counters.MOV,
-        ts: new Date().toISOString(),
-        date: dateVal,
+      DB.Products.updateQty(item.product.id, -item.qty);
+      DB.Movements.create({
         type: 'out',
         productId: item.product.id,
         productCode: item.product.code,
@@ -488,42 +437,19 @@ Object.assign(Sections, {
         qty: item.qty,
         brand: item.product.brand || '',
         model: item.product.model || '',
+        date: dateVal,
         customer: customerVal,
         operator: operator
-      };
-      movements.unshift(mov);
-      newMovements.push(mov);
-    });
-
-    // Salva tutto in localStorage in una volta sola
-    localStorage.setItem('agavewms_products', JSON.stringify(products));
-    localStorage.setItem('agavewms_movements', JSON.stringify(movements));
-    localStorage.setItem('agavewms_counters', JSON.stringify(counters));
-
-    // Push unico verso Firebase / data.json
-    DB.Backup.autoBackup();
-    if (typeof pushBatch === 'function') {
-      pushBatch(products, movements, counters);
-    } else {
-      // Fallback: aggiunge al tx_log e triggera pushToServer
-      const PREFIX = 'agavewms_';
-      const txArr = JSON.parse(localStorage.getItem(PREFIX + 'tx_log') || '[]');
-      outboundCart.forEach((item, i) => {
-        txArr.push({ entity: 'Products', action: 'updateQty', args: [item.product.id, -item.qty], ts: Date.now() + i });
-        txArr.push({ entity: 'Movements', action: 'create', res: newMovements[i], args: [newMovements[i]], ts: Date.now() + i + 0.5 });
       });
-      localStorage.setItem(PREFIX + 'tx_log', JSON.stringify(txArr));
-    }
+    });
 
     const totalQtyOut = outboundCart.reduce((s,i)=>s+i.qty, 0);
     App.toast(`Scarico di ${totalQtyOut} pezzi registrato con successo`, 'success');
-    console.log('[AgaveWMS] saveCumulativeOutbound: movimenti totali dopo save:', movements.length);
+    console.log('[AgaveWMS] saveCumulativeOutbound: movimenti totali dopo save:', DB.Movements.all().length);
     outboundCart = [];
-    // Reset filtri movimenti per mostrare sempre i nuovi movimenti
     if (window._movFilt) { window._movFilt.from = ''; window._movFilt.to = ''; window._movFilt.type = 'out'; window._movFilt.q = ''; }
     App.updateNotifications();
     this.renderOutbound();
-    // Aggiorna anche la lista movimenti se visibile
     if (document.getElementById('section-movements')) this.renderMovements();
   },
 
