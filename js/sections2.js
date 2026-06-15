@@ -280,8 +280,12 @@ Object.assign(Sections, {
       });
     });
 
-    App.toast(`Carico di ${inboundCart.reduce((s,i)=>s+i.qty, 0)} pezzi registrato con successo`, 'success');
+    const totalQty = inboundCart.reduce((s,i)=>s+i.qty, 0);
+    App.toast(`Carico di ${totalQty} pezzi registrato con successo`, 'success');
+    console.log('[AgaveWMS] saveCumulativeInbound: movimenti totali dopo save:', DB.Movements.all().length);
     inboundCart = [];
+    // Reset filtri movimenti per mostrare sempre i nuovi movimenti
+    if (window._movFilt) { window._movFilt.from = ''; window._movFilt.to = ''; window._movFilt.type = 'in'; window._movFilt.q = ''; }
     App.updateNotifications();
     this.renderInbound();
     // Aggiorna anche la lista movimenti se visibile
@@ -441,8 +445,12 @@ Object.assign(Sections, {
       });
     });
 
-    App.toast(`Scarico di ${outboundCart.reduce((s,i)=>s+i.qty, 0)} pezzi registrato con successo`, 'success');
+    const totalQtyOut = outboundCart.reduce((s,i)=>s+i.qty, 0);
+    App.toast(`Scarico di ${totalQtyOut} pezzi registrato con successo`, 'success');
+    console.log('[AgaveWMS] saveCumulativeOutbound: movimenti totali dopo save:', DB.Movements.all().length);
     outboundCart = [];
+    // Reset filtri movimenti per mostrare sempre i nuovi movimenti
+    if (window._movFilt) { window._movFilt.from = ''; window._movFilt.to = ''; window._movFilt.type = 'out'; window._movFilt.q = ''; }
     App.updateNotifications();
     this.renderOutbound();
     // Aggiorna anche la lista movimenti se visibile
