@@ -266,6 +266,7 @@ Object.assign(Sections, {
     const operator = App.getUser()?.name || 'admin';
 
     inboundCart.forEach(item => {
+      DB.Products.updateQty(item.product.id, item.qty);
       DB.Movements.create({
         type: 'in',
         productId: item.product.id,
@@ -277,7 +278,6 @@ Object.assign(Sections, {
         date: dateVal,
         operator: operator
       });
-      DB.Products.updateQty(item.product.id, item.qty);
     });
 
     App.toast(`Carico di ${inboundCart.reduce((s,i)=>s+i.qty, 0)} pezzi registrato con successo`, 'success');
