@@ -18093,6 +18093,33 @@
   ],
   "movements": [
     {
+      "id": 8377,
+      "ts": "2026-06-15T20:08:59.698Z",
+      "date": "2026-06-15",
+      "type": "in",
+      "productId": 22713,
+      "productCode": "PRD22713",
+      "productName": "3 Rosa Crema corpo 200 ml",
+      "qty": 1,
+      "brand": "Erbolario",
+      "model": "ND",
+      "operator": "Amministratore"
+    },
+    {
+      "id": 8376,
+      "ts": "2026-06-15T20:08:46.203Z",
+      "date": "2026-06-15",
+      "type": "out",
+      "productId": 22713,
+      "productCode": "PRD22713",
+      "productName": "3 Rosa Crema corpo 200 ml",
+      "qty": 1,
+      "brand": "Erbolario",
+      "model": "ND",
+      "customer": "",
+      "operator": "Amministratore"
+    },
+    {
       "id": 8375,
       "ts": "2026-06-10T16:13:56.968Z",
       "date": "2026-06-10",
@@ -107751,7 +107778,7 @@
   },
   "counters": {
     "PRD": 23762,
-    "MOV": 8375,
+    "MOV": 8377,
     "USR": 10,
     "PROT": 11779
   }
