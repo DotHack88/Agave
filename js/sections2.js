@@ -99,7 +99,8 @@ Object.assign(Sections, {
   handleOutboundBarcode(barcode) {
     const p = DB.Products.findByCode(barcode);
     if (p) {
-      this.instantOutbound(p);
+      this.addToOutboundCart(p);
+      App.toast(`➕ ${p.name} aggiunto alla lista`, 'success');
     } else {
       App.toast(`⚠ Barcode non registrato: ${barcode}`, 'warning');
       App.openModal('Prodotto Non Trovato', `
@@ -395,7 +396,7 @@ Object.assign(Sections, {
   selectOutboundSearchProd(id) {
     const p = DB.Products.find(id);
     if (p) {
-      this.instantOutbound(p);
+      this.addToOutboundCart(p);
       const searchInput = document.getElementById('ob-search-input');
       if (searchInput) {
         searchInput.value = '';
@@ -423,6 +424,7 @@ Object.assign(Sections, {
     const operator = App.getUser()?.name || 'admin';
 
     outboundCart.forEach(item => {
+      DB.Products.updateQty(item.product.id, -item.qty);
       DB.Movements.create({
         type: 'out',
         productId: item.product.id,
@@ -435,7 +437,6 @@ Object.assign(Sections, {
         customer: customerVal,
         operator: operator
       });
-      DB.Products.updateQty(item.product.id, -item.qty);
     });
 
     App.toast(`Scarico di ${outboundCart.reduce((s,i)=>s+i.qty, 0)} pezzi registrato con successo`, 'success');
