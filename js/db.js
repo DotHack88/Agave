@@ -931,6 +931,62 @@ const DB = (() => {
     }, 300); // debounce 300ms — evita scritture multiple in rapida successione
   }
 
+  // Push atomico di un batch completo — usato da saveCumulativeInbound/Outbound
+  // Bypassa il txLog per evitare race condition con operazioni multiple
+  async function pushBatch(products, movements, counters) {
+    if (_isLocalhost) {
+      // Su localhost: scrivi direttamente su data.json
+      try {
+        await fetch('/api/bulk-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            products:  products,
+            movements: movements,
+            users:     load(KEYS.users)     || [],
+            settings:  load(KEYS.settings)  || {},
+            counters:  counters
+          })
+        });
+        console.log('[AgaveWMS] ✅ [LOCALE] Batch salvato su data.json');
+      } catch(e) {
+        console.warn('[AgaveWMS] ⚠️ [LOCALE] pushBatch fallito:', e.message);
+      }
+      return;
+    }
+    // In produzione: scrivi direttamente su Firebase con PUT completo
+    if (_syncInProgress) { _syncPending = true; return; }
+    _syncInProgress = true;
+    _syncPending = false;
+    try {
+      const serverData = {
+        initialized: true,
+        products:  products,
+        movements: movements,
+        users:     load(KEYS.users)     || [],
+        settings:  load(KEYS.settings)  || {},
+        counters:  counters
+      };
+      const putRes = await fetch(FIREBASE_URL + '/data.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverData)
+      });
+      if (!putRes.ok) throw new Error('PUT HTTP ' + putRes.status);
+      // Svuota txLog (le operazioni sono già in Firebase)
+      save(PREFIX + 'tx_log', []);
+      save(KEYS.counters, counters);
+      console.log('[AgaveWMS] ✅ [FIREBASE] Batch atomico salvato (' + movements.length + ' movimenti)');
+    } catch(e) {
+      console.warn('[AgaveWMS] ⚠️ pushBatch Firebase fallito:', e.message);
+      // Fallback: salva tramite txLog normale
+      pushToServer();
+    } finally {
+      _syncInProgress = false;
+      if (_syncPending) pushToServer();
+    }
+  }
+
   // Helper to trigger backup + server push after mutation
   function mutate(fn, entity, action) {
     return function (...args) {
@@ -962,5 +1018,5 @@ const DB = (() => {
 
   init();
   Backup.dailyBackup();
-  return { Products, Movements, Users, Settings, CSV, Backup, LocalBackup };
+  return { Products, Movements, Users, Settings, CSV, Backup, LocalBackup, pushBatch };
 })();
