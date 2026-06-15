@@ -208,34 +208,81 @@ const DB = (() => {
     }
   }
 
-  // Polling ogni 30s — solo in produzione (Firebase)
+  // Unified Polling for client synchronization
   setInterval(async () => {
-    if (_isLocalhost) return; // ← su localhost nessun polling Firebase
-    if (_syncInProgress) return;
-    
-    const txLog = load(PREFIX + 'tx_log') || [];
-    if (txLog.length > 0) {
-      pushToServer();
-      return;
-    }
+    if (_syncInProgress || _localPushDebounce !== null) return;
 
-    try {
-      const res = await fetch(FIREBASE_URL + '/data.json');
-      if (!res.ok) return;
-      const serverData = (await res.json()) || {};
-      if (serverData.initialized) {
-        save(KEYS.products,  serverData.products  || []);
-        save(KEYS.movements, serverData.movements || []);
-        if (serverData.counters) save(KEYS.counters, serverData.counters);
-      }
-      if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
-        const section = document.querySelector('.nav-item.active')?.dataset?.section;
-        if (section && typeof Sections !== 'undefined') {
-          try { Sections.render(section); } catch(e) {}
+    if (_isLocalhost) {
+      // ── LOCALHOST SYNC ──
+      try {
+        const res = await fetch('/api/initialize');
+        if (!res.ok) return;
+        const serverData = await res.json();
+        
+        if (serverData && serverData.products) {
+          const localProducts = load(KEYS.products) || [];
+          const localMovements = load(KEYS.movements) || [];
+          const localCounters = load(KEYS.counters) || {};
+          
+          const pChanged = JSON.stringify(localProducts) !== JSON.stringify(serverData.products);
+          const mChanged = JSON.stringify(localMovements) !== JSON.stringify(serverData.movements || []);
+          const cChanged = JSON.stringify(localCounters) !== JSON.stringify(serverData.counters || {});
+          
+          if (pChanged || mChanged || cChanged) {
+            save(KEYS.products,  serverData.products);
+            save(KEYS.movements, serverData.movements || []);
+            if (serverData.users && serverData.users.length > 0) save(KEYS.users, serverData.users);
+            if (serverData.settings && Object.keys(serverData.settings).length > 0) save(KEYS.settings, serverData.settings);
+            if (serverData.counters) save(KEYS.counters, serverData.counters);
+            
+            console.log('[AgaveWMS] 🔄 Rilevate modifiche sul server locale. Aggiornamento interfaccia...');
+            if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
+              const section = document.querySelector('.nav-item.active')?.dataset?.section;
+              if (section && typeof Sections !== 'undefined') {
+                try { Sections.render(section); } catch(e) {}
+              }
+            }
+          }
         }
+      } catch(e) { /* silenzioso */ }
+    } else {
+      // ── PRODUCTION SYNC (Firebase) ──
+      const txLog = load(PREFIX + 'tx_log') || [];
+      if (txLog.length > 0) {
+        pushToServer();
+        return;
       }
-    } catch(e) { /* silenzioso */ }
-  }, 30000);
+
+      try {
+        const res = await fetch(FIREBASE_URL + '/data.json');
+        if (!res.ok) return;
+        const serverData = (await res.json()) || {};
+        if (serverData.initialized) {
+          const localProducts = load(KEYS.products) || [];
+          const localMovements = load(KEYS.movements) || [];
+          const localCounters = load(KEYS.counters) || {};
+          
+          const pChanged = JSON.stringify(localProducts) !== JSON.stringify(serverData.products || []);
+          const mChanged = JSON.stringify(localMovements) !== JSON.stringify(serverData.movements || []);
+          const cChanged = JSON.stringify(localCounters) !== JSON.stringify(serverData.counters || {});
+          
+          if (pChanged || mChanged || cChanged) {
+            save(KEYS.products,  serverData.products  || []);
+            save(KEYS.movements, serverData.movements || []);
+            if (serverData.counters) save(KEYS.counters, serverData.counters);
+            
+            console.log('[AgaveWMS] 🔄 Rilevate modifiche su Firebase. Aggiornamento interfaccia...');
+            if (typeof App !== 'undefined' && App.getUser && App.getUser()) {
+              const section = document.querySelector('.nav-item.active')?.dataset?.section;
+              if (section && typeof Sections !== 'undefined') {
+                try { Sections.render(section); } catch(e) {}
+              }
+            }
+          }
+        }
+      } catch(e) { /* silenzioso */ }
+    }
+  }, 5000); // Poll every 5s for fast multi-user collaboration
 
   // ── INIT ──
   function init() {
@@ -512,7 +559,10 @@ const DB = (() => {
 
   // ── SETTINGS ──
   const Settings = {
-    get() { return load(KEYS.settings) || {}; },
+    get() {
+      const s = load(KEYS.settings);
+      return (s && typeof s === 'object' && !Array.isArray(s)) ? s : {};
+    },
     set(data) { save(KEYS.settings, { ...this.get(), ...data }); }
   };
 
@@ -937,6 +987,8 @@ const DB = (() => {
         });
       } catch(e) {
         console.warn('[AgaveWMS] ⚠️ [LOCALE] Salvataggio su data.json fallito:', e.message);
+      } finally {
+        _localPushDebounce = null;
       }
     }, 300); // debounce 300ms — evita scritture multiple in rapida successione
   }

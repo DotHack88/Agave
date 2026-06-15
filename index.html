@@ -34,6 +34,9 @@
     </div>
     <div id="login-error" class="login-error hidden">Credenziali non valide</div>
     <button class="btn btn-primary btn-full" onclick="App.login()">Accedi</button>
+    <div style="text-align:center;margin-top:16px">
+      <a href="#" onclick="localStorage.clear();sessionStorage.clear();window.location.reload();" style="color:var(--text3);font-size:.78rem;text-decoration:underline">Ripristina stato locale (se riscontri problemi)</a>
+    </div>
   </div>
 </div>
 

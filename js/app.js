@@ -272,8 +272,34 @@ const App = (() => {
 
   // ── SESSION & STANDALONE ROUTING ──
   function initSession() {
+    // Rileva ed elimina eventuali Service Worker residui da altri progetti su localhost
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (const registration of registrations) {
+          registration.unregister().then(success => {
+            if (success) {
+              console.log('[AgaveWMS] Service Worker residuo rimosso con successo. Ricarico la pagina...');
+              window.location.reload();
+            }
+          });
+        }
+      });
+    }
+
     let savedUser = null;
-    try { savedUser = JSON.parse(localStorage.getItem('agavewms_currentUser')); } catch (e) {}
+    try {
+      const raw = localStorage.getItem('agavewms_currentUser');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && typeof parsed.name === 'string' && parsed.name.length > 0 && typeof parsed.role === 'string') {
+          savedUser = parsed;
+        } else {
+          localStorage.removeItem('agavewms_currentUser');
+        }
+      }
+    } catch (e) {
+      localStorage.removeItem('agavewms_currentUser');
+    }
     currentUser = savedUser;
 
     const urlParams = new URLSearchParams(window.location.search);

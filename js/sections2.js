@@ -147,7 +147,10 @@ Object.assign(Sections, {
   // ── INBOUND VIEW ──
   renderInbound() {
     const el = document.getElementById('section-inbound');
-    el.innerHTML = `
+    const hasStructure = el && el.querySelector('#ib-search-input') !== null;
+
+    if (!hasStructure) {
+      el.innerHTML = `
 <div class="page-header">
   <h1>Entrata Merci</h1>
   <div class="actions">
@@ -176,25 +179,7 @@ Object.assign(Sections, {
             <th>Azione</th>
           </tr>
         </thead>
-        <tbody id="ib-cart-tbody">
-          ${inboundCart.map(item => `
-            <tr>
-              <td><div class="td-code">${item.product.code}</div><div class="td-code" style="font-size:.7rem;color:var(--text3)">${item.product.barcode || ''}</div></td>
-              <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
-              <td>${App.escape(item.product.brand || '—')}</td>
-              <td>
-                <div style="display:flex;align-items:center;gap:4px">
-                  <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateInboundQty(${item.product.id}, ${item.qty - 1})">-</button>
-                  <input type="number" min="1" value="${item.qty}" onchange="Sections.updateInboundQty(${item.product.id}, this.value)" style="width:50px;text-align:center;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border)"/>
-                  <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateInboundQty(${item.product.id}, ${item.qty + 1})">+</button>
-                </div>
-              </td>
-              <td>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.removeFromInboundCart(${item.product.id})">🗑️</button>
-              </td>
-            </tr>
-          `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">La lista è vuota. Scansiona o cerca prodotti per aggiungerli.</td></tr>'}
-        </tbody>
+        <tbody id="ib-cart-tbody"></tbody>
       </table>
     </div>
 
@@ -203,8 +188,8 @@ Object.assign(Sections, {
     </div>
 
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn btn-success" onclick="Sections.saveCumulativeInbound()">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Registra Entrata (${inboundCart.reduce((s,i)=>s+i.qty, 0)} pz)
+      <button id="ib-register-btn" class="btn btn-success" onclick="Sections.saveCumulativeInbound()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Registra Entrata (0 pz)
       </button>
       <button class="btn btn-ghost" onclick="Sections.clearInboundCart()">Svuota lista</button>
     </div>
@@ -214,16 +199,47 @@ Object.assign(Sections, {
     <div class="card-header"><span class="card-title">🕐 Ultime Entrate</span></div>
     <div class="table-wrap"><table>
       <thead><tr><th>Data</th><th>Prodotto</th><th>Qty</th><th>Marca</th></tr></thead>
-      <tbody>${DB.Movements.filter({type:'in'}).slice(0,10).map(m=>`<tr>
+      <tbody id="ib-recent-tbody"></tbody>
+    </table></div>
+  </div>
+</div>`;
+    }
+
+    const cartTbody = document.getElementById('ib-cart-tbody');
+    if (cartTbody) {
+      cartTbody.innerHTML = inboundCart.map(item => `
+        <tr>
+          <td><div class="td-code">${item.product.code}</div><div class="td-code" style="font-size:.7rem;color:var(--text3)">${item.product.barcode || ''}</div></td>
+          <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
+          <td>${App.escape(item.product.brand || '—')}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateInboundQty(${item.product.id}, ${item.qty - 1})">-</button>
+              <input type="number" min="1" value="${item.qty}" onchange="Sections.updateInboundQty(${item.product.id}, this.value)" style="width:50px;text-align:center;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border)"/>
+              <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateInboundQty(${item.product.id}, ${item.qty + 1})">+</button>
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.removeFromInboundCart(${item.product.id})">🗑️</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">La lista è vuota. Scansiona o cerca prodotti per aggiungerli.</td></tr>';
+    }
+
+    const regBtn = document.getElementById('ib-register-btn');
+    if (regBtn) {
+      regBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Registra Entrata (${inboundCart.reduce((s,i)=>s+i.qty, 0)} pz)`;
+    }
+
+    const recentTbody = document.getElementById('ib-recent-tbody');
+    if (recentTbody) {
+      recentTbody.innerHTML = DB.Movements.filter({type:'in'}).slice(0,10).map(m=>`<tr>
         <td style="font-size:.8rem">${App.fmtDate(m.date)}</td>
         <td><div class="product-link" style="font-weight:600;font-size:.85rem" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div></td>
         <td><span class="badge badge-green">+${m.qty}</span></td>
         <td style="font-size:.82rem">${App.escape(m.brand || '—')}</td>
-      </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Nessuna entrata</p></div></td></tr>'}
-      </tbody>
-    </table></div>
-  </div>
-</div>`;
+      </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Nessuna entrata</p></div></td></tr>';
+    }
   },
 
   searchInboundProd(q) {
@@ -293,7 +309,10 @@ Object.assign(Sections, {
   // ── OUTBOUND VIEW ──
   renderOutbound() {
     const el = document.getElementById('section-outbound');
-    el.innerHTML = `
+    const hasStructure = el && el.querySelector('#ob-search-input') !== null;
+
+    if (!hasStructure) {
+      el.innerHTML = `
 <div class="page-header">
   <h1>Uscita Merci</h1>
   <div class="actions">
@@ -322,25 +341,7 @@ Object.assign(Sections, {
             <th>Azione</th>
           </tr>
         </thead>
-        <tbody id="ob-cart-tbody">
-          ${outboundCart.map(item => `
-            <tr>
-              <td><div class="td-code">${item.product.code}</div><div class="td-code" style="font-size:.7rem;color:var(--text3)">${item.product.barcode || ''}</div></td>
-              <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
-              <td>${App.escape(item.product.brand || '—')}</td>
-              <td>
-                <div style="display:flex;align-items:center;gap:4px">
-                  <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateOutboundQty(${item.product.id}, ${item.qty - 1})">-</button>
-                  <input type="number" min="1" max="${item.product.qty}" value="${item.qty}" onchange="Sections.updateOutboundQty(${item.product.id}, this.value)" style="width:50px;text-align:center;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border)"/>
-                  <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateOutboundQty(${item.product.id}, ${item.qty + 1})">+</button>
-                </div>
-              </td>
-              <td>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.removeFromOutboundCart(${item.product.id})">🗑️</button>
-              </td>
-            </tr>
-          `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">La lista è vuota. Scansiona o cerca prodotti per aggiungerli.</td></tr>'}
-        </tbody>
+        <tbody id="ob-cart-tbody"></tbody>
       </table>
     </div>
 
@@ -350,8 +351,8 @@ Object.assign(Sections, {
     </div>
 
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn btn-danger" onclick="Sections.saveCumulativeOutbound()">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Registra Uscita (${outboundCart.reduce((s,i)=>s+i.qty, 0)} pz)
+      <button id="ob-register-btn" class="btn btn-danger" onclick="Sections.saveCumulativeOutbound()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Registra Uscita (0 pz)
       </button>
       <button class="btn btn-ghost" onclick="Sections.clearOutboundCart()">Svuota lista</button>
     </div>
@@ -361,16 +362,47 @@ Object.assign(Sections, {
     <div class="card-header"><span class="card-title">🕐 Ultime Uscite</span></div>
     <div class="table-wrap"><table>
       <thead><tr><th>Data</th><th>Prodotto</th><th>Qty</th><th>Destinatario</th></tr></thead>
-      <tbody>${DB.Movements.filter({type:'out'}).slice(0,10).map(m=>`<tr>
+      <tbody id="ob-recent-tbody"></tbody>
+    </table></div>
+  </div>
+</div>`;
+    }
+
+    const cartTbody = document.getElementById('ob-cart-tbody');
+    if (cartTbody) {
+      cartTbody.innerHTML = outboundCart.map(item => `
+        <tr>
+          <td><div class="td-code">${item.product.code}</div><div class="td-code" style="font-size:.7rem;color:var(--text3)">${item.product.barcode || ''}</div></td>
+          <td class="product-link" style="font-weight:600" onclick="Sections.showProductActions(${item.product.id})">${App.escape(item.product.name)}</td>
+          <td>${App.escape(item.product.brand || '—')}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateOutboundQty(${item.product.id}, ${item.qty - 1})">-</button>
+              <input type="number" min="1" max="${item.product.qty}" value="${item.qty}" onchange="Sections.updateOutboundQty(${item.product.id}, this.value)" style="width:50px;text-align:center;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border)"/>
+              <button class="btn btn-ghost btn-sm" style="padding:4px 8px" onclick="Sections.updateOutboundQty(${item.product.id}, ${item.qty + 1})">+</button>
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="Sections.removeFromOutboundCart(${item.product.id})">🗑️</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">La lista è vuota. Scansiona o cerca prodotti per aggiungerli.</td></tr>';
+    }
+
+    const regBtn = document.getElementById('ob-register-btn');
+    if (regBtn) {
+      regBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Registra Uscita (${outboundCart.reduce((s,i)=>s+i.qty, 0)} pz)`;
+    }
+
+    const recentTbody = document.getElementById('ob-recent-tbody');
+    if (recentTbody) {
+      recentTbody.innerHTML = DB.Movements.filter({type:'out'}).slice(0,10).map(m=>`<tr>
         <td style="font-size:.8rem">${App.fmtDate(m.date)}</td>
         <td><div class="product-link" style="font-weight:600;font-size:.85rem" onclick="Sections.showProductActions(${m.productId})">${App.escape(m.productName)}</div></td>
         <td><span class="badge badge-red">-${m.qty}</span></td>
         <td style="font-size:.82rem">${App.escape(m.customer || '—')}</td>
-      </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Nessuna uscita</p></div></td></tr>'}
-      </tbody>
-    </table></div>
-  </div>
-</div>`;
+      </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Nessuna uscita</p></div></td></tr>';
+    }
   },
 
   searchOutboundProd(q) {
