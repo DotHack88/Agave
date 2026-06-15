@@ -284,6 +284,8 @@ Object.assign(Sections, {
     inboundCart = [];
     App.updateNotifications();
     this.renderInbound();
+    // Aggiorna anche la lista movimenti se visibile
+    if (document.getElementById('section-movements')) this.renderMovements();
   },
 
   // ── OUTBOUND VIEW ──
@@ -443,6 +445,8 @@ Object.assign(Sections, {
     outboundCart = [];
     App.updateNotifications();
     this.renderOutbound();
+    // Aggiorna anche la lista movimenti se visibile
+    if (document.getElementById('section-movements')) this.renderMovements();
   },
 
   // ── MOVEMENTS VIEW WITH SORTING ──
